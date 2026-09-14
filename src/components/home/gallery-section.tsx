@@ -4,11 +4,11 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { GlowButton } from "@/components/ui/glow-button";
 
 const photos = [
-  { seed: "hima-ti-gallery-1", className: "sm:col-span-2 sm:row-span-2" },
-  { seed: "hima-ti-gallery-2", className: "" },
-  { seed: "hima-ti-gallery-3", className: "" },
-  { seed: "hima-ti-gallery-4", className: "" },
-  { seed: "hima-ti-gallery-5", className: "" },
+  { src: "/gallery/gallery-01.webp", className: "sm:col-span-2 sm:row-span-2" },
+  { src: "/gallery/gallery-02.webp", className: "" },
+  { src: "/gallery/gallery-03.webp", className: "" },
+  { src: "/gallery/gallery-04.webp", className: "" },
+  { src: "/gallery/gallery-05.webp", className: "" },
 ];
 
 export function GallerySection() {
@@ -22,12 +22,12 @@ export function GallerySection() {
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:grid-rows-2">
           {photos.map((photo, i) => (
             <Reveal
-              key={photo.seed}
+              key={photo.src}
               delay={120 + i * 80}
-              className={`relative aspect-square overflow-hidden rounded-xl ${photo.className}`}
+              className={`relative h-0 w-full overflow-hidden rounded-xl pt-[100%] ${photo.className}`}
             >
               <Image
-                src={`https://picsum.photos/seed/${photo.seed}/700/700`}
+                src={photo.src}
                 alt="Dokumentasi kegiatan HIMA TI"
                 fill
                 sizes="(min-width: 640px) 25vw, 50vw"
