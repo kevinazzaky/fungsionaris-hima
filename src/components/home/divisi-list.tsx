@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import {
   Broadcast,
   GraduationCap,
   Handshake,
   IdentificationBadge,
 } from "@phosphor-icons/react/dist/ssr";
+import { ProfileAvatar } from "@/components/ui/profile-avatar";
 
 const groups = [
   {
@@ -15,8 +15,8 @@ const groups = [
     icon: IdentificationBadge,
     name: "Delegasi",
     members: [
-      { name: "Ardelia Naenda Ahmadi", role: "Delegasi", seed: "hima-ti-delegasi-1" },
-      { name: "Sad Bagus Ketut Ak", role: "Delegasi", seed: "hima-ti-delegasi-2" },
+      { name: "Ardelia Naenda Ahmadi", role: "Delegasi" },
+      { name: "Sad Bagus Ketut Ak", role: "Delegasi" },
     ],
   },
   {
@@ -24,11 +24,11 @@ const groups = [
     icon: Handshake,
     name: "Divisi HH",
     members: [
-      { name: "Yunima Dioranda Manik", role: "Koordinator", seed: "hima-ti-hh-1" },
-      { name: "Indriani Asten", role: "Anggota", seed: "hima-ti-hh-2" },
-      { name: "A.A Ngurah Agung Mahendra Sedana", role: "Anggota", seed: "hima-ti-hh-3" },
-      { name: "I Komang Dika Gus Septa", role: "Anggota", seed: "hima-ti-hh-4" },
-      { name: "Gede Bagus Indra Tanaya", role: "Anggota", seed: "hima-ti-hh-5" },
+      { name: "Yunima Dioranda Manik", role: "Koordinator" },
+      { name: "Indriani Asten", role: "Anggota" },
+      { name: "A.A Ngurah Agung Mahendra Sedana", role: "Anggota" },
+      { name: "I Komang Dika Gus Septa", role: "Anggota" },
+      { name: "Gede Bagus Indra Tanaya", role: "Anggota" },
     ],
   },
   {
@@ -36,13 +36,13 @@ const groups = [
     icon: GraduationCap,
     name: "Divisi PSDM",
     members: [
-      { name: "Benedito Nidio Da Rosa Maia Tilman", role: "Koordinator", seed: "hima-ti-psdm-1" },
-      { name: "Ida Bagus Sugiharta Dharma Putra", role: "Anggota", seed: "hima-ti-psdm-2" },
-      { name: "Gusti Ngurah Ardana Wijaya", role: "Anggota", seed: "hima-ti-psdm-3" },
-      { name: "Zintia Adella", role: "Anggota", seed: "hima-ti-psdm-4" },
-      { name: "Adelia Surya Putri", role: "Anggota", seed: "hima-ti-psdm-5" },
-      { name: "I Made Dandi Prayata Ardana", role: "Anggota", seed: "hima-ti-psdm-6" },
-      { name: "Komang Indra Wirawan", role: "Anggota", seed: "hima-ti-psdm-7" },
+      { name: "Benedito Nidio Da Rosa Maia Tilman", role: "Koordinator" },
+      { name: "Ida Bagus Sugiharta Dharma Putra", role: "Anggota" },
+      { name: "Gusti Ngurah Ardana Wijaya", role: "Anggota" },
+      { name: "Zintia Adella", role: "Anggota" },
+      { name: "Adelia Surya Putri", role: "Anggota" },
+      { name: "I Made Dandi Prayata Ardana", role: "Anggota" },
+      { name: "Komang Indra Wirawan", role: "Anggota" },
     ],
   },
   {
@@ -50,12 +50,12 @@ const groups = [
     icon: Broadcast,
     name: "Divisi Kominfo",
     members: [
-      { name: "Cevyn Eduard Imanuel Dapa Talu", role: "Koordinator", seed: "hima-ti-kominfo-1" },
-      { name: "Gabriel Jehuda Tamedo", role: "Anggota", seed: "hima-ti-kominfo-2" },
-      { name: "Mochammad Akmal Anfal", role: "Anggota", seed: "hima-ti-kominfo-3" },
-      { name: "Evan Safi Maulana Malik Ibrahim", role: "Anggota", seed: "hima-ti-kominfo-4" },
-      { name: "I Wayan Yoga Karang", role: "Anggota", seed: "hima-ti-kominfo-5" },
-      { name: "Friendly Riantha Dwi Pratama", role: "Anggota", seed: "hima-ti-kominfo-6" },
+      { name: "Cevyn Eduard Imanuel Dapa Talu", role: "Koordinator" },
+      { name: "Gabriel Jehuda Tamedo", role: "Anggota" },
+      { name: "Mochammad Akmal Anfal", role: "Anggota" },
+      { name: "Evan Safi Maulana Malik Ibrahim", role: "Anggota" },
+      { name: "I Wayan Yoga Karang", role: "Anggota" },
+      { name: "Friendly Riantha Dwi Pratama", role: "Anggota" },
     ],
   },
 ];
@@ -97,13 +97,7 @@ export function DivisiList() {
               className="flex w-40 flex-col items-center overflow-hidden rounded-2xl bg-white p-4 text-center shadow-sm"
             >
               <div className="relative h-20 w-20 overflow-hidden rounded-full">
-                <Image
-                  src={`https://picsum.photos/seed/${member.seed}/200/200`}
-                  alt={member.name}
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                />
+                <ProfileAvatar />
               </div>
               <p className="mt-3 text-sm font-semibold text-zinc-900">
                 {member.name}
