@@ -3,7 +3,11 @@ import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { VisionMissionTabs } from "@/components/detail/vision-mission-tabs";
 
-const iconProps = { size: 24, weight: "bold" as const, className: "text-amber-500" };
+const iconProps = {
+  size: 24,
+  weight: "bold" as const,
+  className: "text-amber-500",
+};
 
 const visionMission = [
   {
