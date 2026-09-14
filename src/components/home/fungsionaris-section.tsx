@@ -1,35 +1,18 @@
-import Image from "next/image";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { GlowButton } from "@/components/ui/glow-button";
 import { DivisiList } from "@/components/home/divisi-list";
+import { DragScroll } from "@/components/ui/drag-scroll";
+import { ProfileAvatar } from "@/components/ui/profile-avatar";
 
 const pengurus = [
-  {
-    name: "Renald Kevin Azzaky",
-    role: "Ketua Umum",
-    seed: "hima-ti-pimpinan-1",
-  },
-  {
-    name: "Kadek Wahyu Santika Putra",
-    role: "Wakil Ketua",
-    seed: "hima-ti-pimpinan-2",
-  },
-  {
-    name: "I Made Dedy Wanditya",
-    role: "Sekretaris Umum",
-    seed: "hima-ti-pimpinan-3",
-  },
-  {
-    name: "Catherine Soenarjo",
-    role: "Bendahara I",
-    seed: "hima-ti-pimpinan-6",
-  },
-  {
-    name: "Made Adelia Febriana",
-    role: "Bendahara II",
-    seed: "hima-ti-pimpinan-7",
-  },
+  { name: "Renald Kevin Azzaky", role: "Ketua Umum" },
+  { name: "Kadek Wahyu Santika Putra", role: "Wakil Ketua" },
+  { name: "I Made Dedy Wanditya", role: "Sekretaris Umum" },
+  { name: "Gusti Ayu Emilia Artika", role: "Sekretaris I" },
+  { name: "Komang Bayu Trias Gautama", role: "Sekretaris II" },
+  { name: "Catherine Soenarjo", role: "Bendahara I" },
+  { name: "Made Adelia Febriana", role: "Bendahara II" },
 ];
 
 export function FungsionarisSection() {
@@ -41,20 +24,14 @@ export function FungsionarisSection() {
         </Reveal>
       </div>
 
-      <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:justify-center sm:px-6">
+      <DragScroll className="mt-10 flex cursor-grab snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4 select-none active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-6 sm:[justify-content:safe_center]">
         {pengurus.map((person, i) => (
           <Reveal
             key={person.name}
             delay={100 + i * 90}
             className="relative aspect-[3/4] w-56 shrink-0 snap-start overflow-hidden rounded-2xl"
           >
-            <Image
-              src={`https://picsum.photos/seed/${person.seed}/500/650`}
-              alt={person.name}
-              fill
-              sizes="224px"
-              className="object-cover"
-            />
+            <ProfileAvatar />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/10 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-4 text-left">
               <p className="font-heading font-semibold text-white">{person.name}</p>
@@ -62,7 +39,7 @@ export function FungsionarisSection() {
             </div>
           </Reveal>
         ))}
-      </div>
+      </DragScroll>
 
       <Reveal delay={100 + pengurus.length * 90} className="mt-10">
         <DivisiList />
