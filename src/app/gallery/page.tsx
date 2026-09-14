@@ -1,7 +1,10 @@
 import Image from "next/image";
 import { DetailHeader } from "@/components/detail/detail-header";
 
-const photos = Array.from({ length: 12 }, (_, i) => `hima-ti-full-gallery-${i + 1}`);
+const photos = Array.from(
+  { length: 14 },
+  (_, i) => `/gallery/gallery-${String(i + 1).padStart(2, "0")}.webp`,
+);
 
 export default function GalleryPage() {
   return (
@@ -13,13 +16,13 @@ export default function GalleryPage() {
 
       <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {photos.map((seed) => (
+          {photos.map((src) => (
             <div
-              key={seed}
-              className="relative aspect-square overflow-hidden rounded-xl"
+              key={src}
+              className="relative h-0 w-full overflow-hidden rounded-xl pt-[100%]"
             >
               <Image
-                src={`https://picsum.photos/seed/${seed}/600/600`}
+                src={src}
                 alt="Dokumentasi kegiatan HIMA TI"
                 fill
                 sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
