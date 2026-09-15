@@ -1,0 +1,31 @@
+/**
+ * Konfigurasi pendaftaran HIMA TI.
+ * Ubah REGISTRATION_OPEN ke true/false untuk membuka atau menutup pendaftaran.
+ * Perubahan di sini otomatis sinkron ke landing page dan halaman pendaftaran.
+ */
+
+export const REGISTRATION_OPEN = true;
+
+export const REGISTRATION_CONFIG = {
+  isOpen: REGISTRATION_OPEN,
+  statusLabel: REGISTRATION_OPEN ? "Pendaftaran Dibuka" : "Pendaftaran Ditutup",
+  statusColor: REGISTRATION_OPEN ? ("green" as const) : ("amber" as const),
+  heroTitle: REGISTRATION_OPEN
+    ? "Bergabunglah Bersama HIMA TI"
+    : "Nantikan Periode Pendaftaran Berikutnya",
+  heroDesc: REGISTRATION_OPEN
+    ? "Periode pendaftaran anggota baru sedang dibuka. Segera daftarkan dirimu sebelum ditutup!"
+    : "Periode pendaftaran saat ini sudah ditutup. Pantau info pendaftaran periode berikutnya lewat media sosial kami.",
+  ctaLabel: REGISTRATION_OPEN ? "Daftar Sekarang" : "Lihat Info Pendaftaran",
+  pageDesc: REGISTRATION_OPEN
+    ? "Periode pendaftaran sedang berlangsung. Segera isi formulir sebelum ditutup."
+    : "Periode pendaftaran saat ini telah berakhir. Ikuti media sosial kami agar tidak ketinggalan info periode berikutnya.",
+} as const;
+
+export const DIVISI_OPTIONS = [
+  { id: "inti", label: "Inti", desc: "Pimpinan dan koordinator kepengurusan" },
+  { id: "delegasi", label: "Delegasi", desc: "Perwakilan resmi dalam kegiatan eksternal" },
+  { id: "hh", label: "HH", desc: "Hubungan dan Harmoni antar anggota" },
+  { id: "psdm", label: "PSDM", desc: "Pengembangan Sumber Daya Manusia" },
+  { id: "kominfo", label: "Kominfo", desc: "Komunikasi dan Informasi publik" },
+];
