@@ -61,7 +61,7 @@ const periods = [
         icon: HandHeart,
         title: "Kerja Sosial",
         body: "Pengabdian masyarakat lewat edukasi dan kegiatan sosial di lingkungan sekitar kampus.",
-        image: "/hero/foto-1.jpg",
+        image: "/proker/kersos-2025.jpg",
       },
       {
         icon: Code,
