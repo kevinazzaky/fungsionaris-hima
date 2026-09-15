@@ -1,17 +1,17 @@
-import Image from "next/image";
-
 export function ProfileAvatar() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
-      <div className="relative h-[42%] w-[42%] opacity-90">
-        <Image
-          src="/brand/logo-emblem.png"
-          alt=""
-          fill
-          sizes="120px"
-          className="object-contain"
-        />
-      </div>
+    <div className="absolute inset-0 flex items-end justify-center overflow-hidden bg-zinc-700">
+      <svg
+        viewBox="0 0 100 80"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-[75%] translate-y-[8%]"
+        aria-hidden="true"
+      >
+        {/* Head */}
+        <circle cx="50" cy="22" r="18" fill="#a1a1aa" />
+        {/* Shoulders */}
+        <ellipse cx="50" cy="72" rx="36" ry="28" fill="#a1a1aa" />
+      </svg>
     </div>
   );
 }
