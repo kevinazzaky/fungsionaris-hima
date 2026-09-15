@@ -4,9 +4,9 @@ import { ArrowRight, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { HeroSlideshow } from "@/components/home/hero-slideshow";
 
 const heroPhotos = [
-  "/hero/foto-1.jpg",
-  "/hero/foto-2.jpg",
-  "/hero/foto-3.jpg",
+  "/gallery/gallery-08.webp",
+  "/gallery/gallery-05.webp",
+  "/gallery/gallery-06.webp",
 ];
 
 export function Hero() {
