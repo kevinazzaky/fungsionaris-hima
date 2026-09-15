@@ -1,7 +1,6 @@
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { FlourishDivider } from "@/components/ui/flourish-divider";
-import { GlowButton } from "@/components/ui/glow-button";
 import { ProgramKerjaTabs } from "@/components/home/program-kerja-tabs";
 
 export function ProgramKerjaSection() {
@@ -21,10 +20,6 @@ export function ProgramKerjaSection() {
 
         <div className="mt-10">
           <ProgramKerjaTabs />
-        </div>
-
-        <div className="mt-10 flex justify-center">
-          <GlowButton href="/program-kerja">Lihat Semua Program Kerja</GlowButton>
         </div>
       </div>
     </section>
