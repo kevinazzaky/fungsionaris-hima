@@ -8,6 +8,7 @@ import {
   Code,
   HandHeart,
   Microphone,
+  ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
 import { Reveal } from "@/components/ui/reveal";
 
@@ -20,13 +21,15 @@ const periods = [
         icon: Microphone,
         title: "Seminar Nasional",
         body: "Pembicara nasional membahas tren teknologi informasi.",
-        image: "/hero/foto-3.jpg",
+        image: "/proker/seminar-nasional.jpg",
       },
       {
         icon: Broadcast,
         title: "Webinar Nasional",
         body: "Diskusi daring bersama praktisi dan akademisi.",
         image: null,
+        date: "03 Oktober",
+        gformLink: "https://docs.google.com/forms/d/e/1FAIpQLSe07p0vZgjx1W1NzMpBUGsXfh6TuUE9s6SCmb8aLVM-F8QZnw/viewform",
       },
       {
         icon: HandHeart,
@@ -62,7 +65,7 @@ const periods = [
         icon: HandHeart,
         title: "Kerja Sosial",
         body: "Pengabdian masyarakat di lingkungan sekitar kampus.",
-        image: "/hero/foto-1.jpg",
+        image: "/proker/kersos-2025.jpg",
       },
       {
         icon: Code,
@@ -129,15 +132,41 @@ export function ProgramKerjaTabs() {
             <Reveal
               key={program.title}
               delay={i * 100}
-              className="flex aspect-[3/4] flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white p-4 text-center"
+              className="relative flex aspect-[3/4] flex-col items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 text-center"
             >
+              <div className="absolute top-4">
+                <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  Coming Soon
+                </span>
+              </div>
+              
               <program.icon size={26} weight="bold" className="text-amber-500" />
+              
               <h3 className="font-heading mt-4 text-sm font-bold text-zinc-900 sm:text-base">
                 {program.title}
               </h3>
-              <p className="mt-1.5 text-xs leading-snug text-zinc-500">
+              
+              {program.date ? (
+                <p className="mt-1 text-xs font-bold text-amber-500">
+                  Hari H: {program.date}
+                </p>
+              ) : null}
+
+              <p className="mt-1.5 text-[11px] leading-snug text-zinc-500">
                 {program.body}
               </p>
+
+              {program.gformLink && (
+                <a
+                  href={program.gformLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-4 left-4 right-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-[11px] font-bold text-zinc-950 transition-colors hover:bg-amber-300"
+                >
+                  Daftar Sekarang
+                  <ArrowRight size={12} weight="bold" />
+                </a>
+              )}
             </Reveal>
           ),
         )}
