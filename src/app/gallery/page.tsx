@@ -1,10 +1,14 @@
-import Image from "next/image";
+import type { Metadata } from "next";
 import { DetailHeader } from "@/components/detail/detail-header";
+import { GalleryGrid } from "@/components/gallery/gallery-grid";
 
-const photos = Array.from(
-  { length: 14 },
-  (_, i) => `/gallery/gallery-${String(i + 1).padStart(2, "0")}.webp`,
-);
+export const metadata: Metadata = {
+  title: "Galeri Kegiatan | HIMA TI",
+  description:
+    "Dokumentasi momen dari berbagai program kerja dan kegiatan HIMA TI.",
+};
+
+import { GALLERY_PHOTOS } from "@/lib/gallery-data";
 
 export default function GalleryPage() {
   return (
@@ -15,22 +19,7 @@ export default function GalleryPage() {
       />
 
       <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {photos.map((src) => (
-            <div
-              key={src}
-              className="relative h-0 w-full overflow-hidden rounded-xl pt-[100%]"
-            >
-              <Image
-                src={src}
-                alt="Dokumentasi kegiatan HIMA TI"
-                fill
-                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-                className="object-cover transition-transform duration-500 hover:scale-105"
-              />
-            </div>
-          ))}
-        </div>
+        <GalleryGrid photos={GALLERY_PHOTOS} initialCount={12} step={12} />
       </section>
     </>
   );
