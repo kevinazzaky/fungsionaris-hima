@@ -22,7 +22,7 @@ export function MobileMenu() {
         aria-label={open ? "Tutup menu" : "Buka menu"}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:text-amber-400"
+        className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-white transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
       >
         {open ? (
           <X size={22} weight="bold" />
