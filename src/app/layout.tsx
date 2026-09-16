@@ -35,9 +35,9 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "HIMA TI - Universitas Pendidikan Nasional",
+  title: "HIMA TI Undiknas - Himpunan Mahasiswa Teknologi Informasi",
   description:
-    "Landing page Himpunan Mahasiswa Teknologi Informasi, Universitas Pendidikan Nasional.",
+    "Portal resmi Himpunan Mahasiswa Program Studi Teknologi Informasi, Universitas Pendidikan Nasional (Undiknas), Denpasar, Bali.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
