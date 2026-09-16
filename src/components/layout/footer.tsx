@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import {
   EnvelopeSimple,
   InstagramLogo,
@@ -7,13 +10,14 @@ import {
   TiktokLogo,
   YoutubeLogo,
 } from "@phosphor-icons/react/dist/ssr";
+import { scrollToSection } from "@/lib/smooth-scroll";
 
 const exploreLinks = [
-  { href: "/#about", label: "Tentang" },
-  { href: "/#program-kerja", label: "Program Kerja" },
-  { href: "/#fungsionaris", label: "Fungsionaris" },
-  { href: "/#galeri", label: "Galeri" },
-  { href: "/#pendaftaran", label: "Pendaftaran" },
+  { id: "about", label: "Tentang" },
+  { id: "program-kerja", label: "Program Kerja" },
+  { id: "fungsionaris", label: "Fungsionaris" },
+  { id: "galeri", label: "Galeri" },
+  { id: "pendaftaran", label: "Pendaftaran" },
 ];
 
 const socials = [
@@ -23,11 +27,26 @@ const socials = [
 ];
 
 export function Footer() {
+  const pathname = usePathname();
+  const router = useRouter();
+
   return (
     <footer id="kontak" className="scroll-mt-16 bg-zinc-950 text-white">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <div>
-          <Link href="/" className="flex items-center gap-2 text-base font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+          <Link
+            href="/"
+            onClick={(e) => {
+              if (pathname === "/") {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                if (window.location.hash) {
+                  window.history.replaceState(null, "", window.location.pathname);
+                }
+              }
+            }}
+            className="flex items-center gap-2 text-base font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
             <Image
               src="/brand/logo-emblem.png"
               alt="Logo HIMA TI"
@@ -48,10 +67,17 @@ export function Footer() {
           <p className="font-heading text-sm font-semibold text-white">Jelajahi</p>
           <ul className="mt-4 space-y-3 text-sm text-white/60">
             {exploreLinks.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className="transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400">
+              <li key={item.id}>
+                <a
+                  href={`/#${item.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection(item.id, pathname, router);
+                  }}
+                  className="transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
+                >
                   {item.label}
-                </Link>
+                </a>
               </li>
             ))}
           </ul>
