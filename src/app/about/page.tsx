@@ -35,10 +35,10 @@ export default function AboutPage() {
       />
 
       <section className="mx-auto max-w-4xl px-6 py-16 sm:py-20">
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl">
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-100 shadow-sm">
           <Image
-            src="https://picsum.photos/seed/hima-ti-about-story/1400/800"
-            alt="Rapat kerja HIMA TI"
+            src="/gallery/gallery-01.webp"
+            alt="Dokumentasi kegiatan dan rapat kerja HIMA TI Undiknas"
             fill
             sizes="(min-width: 768px) 800px, 100vw"
             className="object-cover"
@@ -46,13 +46,9 @@ export default function AboutPage() {
         </div>
 
         <div className="mt-10 max-w-2xl">
-          <h2 className="text-2xl font-bold text-zinc-900">Sejarah Singkat</h2>
+          <h2 className="text-2xl font-bold text-zinc-900">Sejarah &amp; Peran Organisasi</h2>
           <p className="mt-4 text-base leading-relaxed text-zinc-600">
-            HIMA TI dibentuk oleh mahasiswa Program Studi Teknologi Informasi
-            sebagai wadah aspirasi dan pengembangan minat bakat. Sejak
-            berdiri, organisasi ini terus berkembang lewat program kerja
-            akademik, kompetisi, dan pengabdian masyarakat yang melibatkan
-            seluruh angkatan aktif.
+            Himpunan Mahasiswa Teknologi Informasi (HIMA TI) didirikan sebagai badan perwakilan mahasiswa Program Studi Teknologi Informasi di lingkungan Universitas Pendidikan Nasional, Denpasar. Organisasi ini mengoordinasikan berbagai kegiatan akademik, lokakarya teknologi, kompetisi bidang IT, dan program pengabdian masyarakat yang melibatkan mahasiswa aktif di setiap angkatan.
           </p>
         </div>
 
