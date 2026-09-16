@@ -14,12 +14,12 @@ export const REGISTRATION_CONFIG = {
     ? "Bergabunglah Bersama HIMA TI"
     : "Nantikan Periode Pendaftaran Berikutnya",
   heroDesc: REGISTRATION_OPEN
-    ? "Periode pendaftaran anggota baru sedang dibuka. Segera daftarkan dirimu sebelum ditutup!"
-    : "Periode pendaftaran saat ini sudah ditutup. Pantau info pendaftaran periode berikutnya lewat media sosial kami.",
-  ctaLabel: REGISTRATION_OPEN ? "Daftar Sekarang" : "Lihat Info Pendaftaran",
+    ? "Pendaftaran fungsionaris periode 2026 aktif. Pilih divisi yang diminati dan unggah berkas persyaratan."
+    : "Periode pendaftaran saat ini telah berakhir. Pengumuman periode berikutnya akan dipublikasikan melalui media sosial resmi.",
+  ctaLabel: REGISTRATION_OPEN ? "Daftar Fungsionaris" : "Pantau Informasi",
   pageDesc: REGISTRATION_OPEN
-    ? "Periode pendaftaran sedang berlangsung. Segera isi formulir sebelum ditutup."
-    : "Periode pendaftaran saat ini telah berakhir. Ikuti media sosial kami agar tidak ketinggalan info periode berikutnya.",
+    ? "Pendaftaran fungsionaris periode 2026 aktif. Lengkapi formulir pendaftaran dan tentukan pilihan divisi."
+    : "Periode pendaftaran saat ini telah berakhir. Pantau kanal informasi resmi kami untuk jadwal seleksi berikutnya.",
 } as const;
 
 export const DIVISI_OPTIONS = [
