@@ -38,6 +38,15 @@ export const metadata: Metadata = {
   title: "HIMA TI Undiknas - Himpunan Mahasiswa Teknologi Informasi",
   description:
     "Portal resmi Himpunan Mahasiswa Program Studi Teknologi Informasi, Universitas Pendidikan Nasional (Undiknas), Denpasar, Bali.",
+  icons: {
+    icon: [
+      { url: "/brand/logo-emblem.png", type: "image/png" },
+    ],
+    shortcut: ["/brand/logo-emblem.png"],
+    apple: [
+      { url: "/brand/logo-emblem.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
