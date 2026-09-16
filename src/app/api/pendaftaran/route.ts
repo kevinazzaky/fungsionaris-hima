@@ -1,4 +1,5 @@
 import { addPendaftaran, getAllPendaftaran } from "@/lib/pendaftaran-store";
+import { REGISTRATION_OPEN } from "@/lib/pendaftaran-config";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = [
@@ -7,6 +8,13 @@ const ALLOWED_TYPES = [
 
 export async function POST(request: Request) {
   try {
+    if (!REGISTRATION_OPEN) {
+      return Response.json(
+        { error: "Pendaftaran saat ini sedang ditutup karena belum memasuki periode perekrutan." },
+        { status: 403 },
+      );
+    }
+
     const formData = await request.formData();
 
     const nama = formData.get("nama") as string;

@@ -4,7 +4,7 @@
  * Perubahan di sini otomatis sinkron ke landing page dan halaman pendaftaran.
  */
 
-export const REGISTRATION_OPEN = true;
+export const REGISTRATION_OPEN = false;
 
 export const REGISTRATION_CONFIG = {
   isOpen: REGISTRATION_OPEN,
@@ -12,14 +12,14 @@ export const REGISTRATION_CONFIG = {
   statusColor: REGISTRATION_OPEN ? ("green" as const) : ("amber" as const),
   heroTitle: REGISTRATION_OPEN
     ? "Bergabunglah Bersama HIMA TI"
-    : "Nantikan Periode Pendaftaran Berikutnya",
+    : "Pendaftaran Belum Dibuka",
   heroDesc: REGISTRATION_OPEN
     ? "Pendaftaran fungsionaris periode 2026 aktif. Pilih divisi yang diminati dan unggah berkas persyaratan."
-    : "Periode pendaftaran saat ini telah berakhir. Pengumuman periode berikutnya akan dipublikasikan melalui media sosial resmi.",
-  ctaLabel: REGISTRATION_OPEN ? "Daftar Fungsionaris" : "Pantau Informasi",
+    : "Periode pendaftaran fungsionaris saat ini belum dibuka karena belum memasuki periode perekrutan. Pengumuman resmi akan disampaikan melalui media sosial kami.",
+  ctaLabel: REGISTRATION_OPEN ? "Daftar Fungsionaris" : "Lihat Informasi",
   pageDesc: REGISTRATION_OPEN
     ? "Pendaftaran fungsionaris periode 2026 aktif. Lengkapi formulir pendaftaran dan tentukan pilihan divisi."
-    : "Periode pendaftaran saat ini telah berakhir. Pantau kanal informasi resmi kami untuk jadwal seleksi berikutnya.",
+    : "Periode pendaftaran saat ini belum dibuka karena belum memasuki periode perekrutan. Pantau kanal informasi resmi kami untuk jadwal seleksi berikutnya.",
 } as const;
 
 export const DIVISI_OPTIONS = [
