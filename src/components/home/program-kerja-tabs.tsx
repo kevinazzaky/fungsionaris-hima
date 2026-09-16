@@ -10,7 +10,7 @@ import {
   Microphone,
   ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
-import { Reveal } from "@/components/ui/reveal";
+import { motion, AnimatePresence } from "motion/react";
 
 const periods = [
   {
@@ -26,7 +26,7 @@ const periods = [
       {
         icon: Broadcast,
         title: "Webinar Nasional",
-        body: "Diskusi daring bersama praktisi dan akademisi.",
+        body: "Diskusi daring bersama praktisi dan akademisi seputar inovasi AI & cloud.",
         image: null,
         date: "03 Oktober",
         gformLink: "https://docs.google.com/forms/d/e/1FAIpQLSe07p0vZgjx1W1NzMpBUGsXfh6TuUE9s6SCmb8aLVM-F8QZnw/viewform",
@@ -83,94 +83,122 @@ export function ProgramKerjaTabs() {
 
   return (
     <div>
+      {/* Sliding Pill Tab Switcher */}
       <div className="flex justify-center">
-        <div className="inline-flex rounded-full border border-zinc-200 bg-white p-1">
-          {periods.map((period) => (
-            <button
-              key={period.key}
-              type="button"
-              onClick={() => setActive(period.key)}
-              aria-pressed={active === period.key}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                active === period.key
-                  ? "bg-amber-400 text-zinc-950"
-                  : "text-zinc-500 hover:text-zinc-900"
-              }`}
-            >
-              {period.label}
-            </button>
-          ))}
+        <div className="relative inline-flex rounded-full border border-zinc-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+          {periods.map((period) => {
+            const isSelected = active === period.key;
+            return (
+              <button
+                key={period.key}
+                type="button"
+                onClick={() => setActive(period.key)}
+                aria-pressed={isSelected}
+                className={`relative z-10 rounded-full px-6 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                  isSelected ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                {isSelected && (
+                  <motion.span
+                    layoutId="active-period-pill"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    className="absolute inset-0 z-[-1] rounded-full bg-amber-400 shadow-md shadow-amber-400/30"
+                  />
+                )}
+                {period.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {current.programs.map((program, i) =>
-          program.image ? (
-            <Reveal
-              key={program.title}
-              delay={i * 100}
-              className="relative aspect-[3/4] overflow-hidden rounded-xl border border-amber-400/40"
-            >
-              <Image
-                src={program.image}
-                alt={program.title}
-                fill
-                sizes="(min-width: 640px) 25vw, 50vw"
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/95 via-zinc-950/30 to-transparent" />
-              <div className="relative z-10 flex h-full flex-col justify-end p-4">
-                <h3 className="font-heading text-sm font-bold uppercase leading-tight text-white sm:text-base">
+      {/* Animated Card Grid */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={active}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {current.programs.map((program, i) =>
+            program.image ? (
+              <motion.div
+                key={program.title}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-900 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/10"
+              >
+                <Image
+                  src={program.image}
+                  alt={program.title}
+                  fill
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent transition-opacity duration-300 group-hover:opacity-90" />
+                <div className="relative z-10 flex h-full flex-col justify-end p-5">
+                  <h3 className="font-heading text-base font-bold uppercase tracking-tight text-white sm:text-lg">
+                    {program.title}
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
+                    {program.body}
+                  </p>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={program.title}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                className="group relative flex aspect-[3/4] flex-col items-center justify-center overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 text-center shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/50 hover:shadow-xl hover:shadow-amber-500/10"
+              >
+                {/* Status Beacon Top */}
+                <div className="absolute top-5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-zinc-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Coming Soon
+                  </span>
+                </div>
+
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500 transition-transform duration-300 group-hover:scale-110">
+                  <program.icon size={28} weight="bold" />
+                </div>
+
+                <h3 className="font-heading mt-4 text-base font-bold text-zinc-900 sm:text-lg">
                   {program.title}
                 </h3>
-                <p className="mt-1 text-xs leading-snug text-white/70">
+
+                {program.date ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold text-amber-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Hari H: {program.date}
+                  </p>
+                ) : null}
+
+                <p className="mt-2 text-xs leading-relaxed text-zinc-500">
                   {program.body}
                 </p>
-              </div>
-            </Reveal>
-          ) : (
-            <Reveal
-              key={program.title}
-              delay={i * 100}
-              className="relative flex aspect-[3/4] flex-col items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 text-center"
-            >
-              <div className="absolute top-4">
-                <span className="rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                  Coming Soon
-                </span>
-              </div>
-              
-              <program.icon size={26} weight="bold" className="text-amber-500" />
-              
-              <h3 className="font-heading mt-4 text-sm font-bold text-zinc-900 sm:text-base">
-                {program.title}
-              </h3>
-              
-              {program.date ? (
-                <p className="mt-1 text-xs font-bold text-amber-500">
-                  Hari H: {program.date}
-                </p>
-              ) : null}
 
-              <p className="mt-1.5 text-[11px] leading-snug text-zinc-500">
-                {program.body}
-              </p>
-
-              {program.gformLink && (
-                <a
-                  href={program.gformLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-4 left-4 right-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-[11px] font-bold text-zinc-950 transition-colors hover:bg-amber-300"
-                >
-                  Daftar Sekarang
-                  <ArrowRight size={12} weight="bold" />
-                </a>
-              )}
-            </Reveal>
-          ),
-        )}
-      </div>
+                {program.gformLink && (
+                  <a
+                    href={program.gformLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-5 left-5 right-5 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-200 hover:bg-amber-300 hover:shadow-md active:scale-95"
+                  >
+                    Daftar Sekarang
+                    <ArrowRight size={13} weight="bold" />
+                  </a>
+                )}
+              </motion.div>
+            ),
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
