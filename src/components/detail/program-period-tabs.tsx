@@ -26,7 +26,7 @@ const periods = [
         icon: Broadcast,
         title: "Webinar Nasional",
         body: "Diskusi daring bersama praktisi dan akademisi seputar dunia teknologi.",
-        image: null,
+        image: "/proker/webinar-nasional.jpg",
       },
       {
         icon: HandHeart,

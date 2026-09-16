@@ -7,8 +7,6 @@ import {
   EnvelopeSimple,
   InstagramLogo,
   MapPin,
-  TiktokLogo,
-  YoutubeLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { scrollToSection } from "@/lib/smooth-scroll";
 
@@ -21,9 +19,11 @@ const exploreLinks = [
 ];
 
 const socials = [
-  { href: "https://instagram.com/himati.undiknas", label: "Instagram", icon: InstagramLogo },
-  { href: "https://tiktok.com/@himati.undiknas", label: "TikTok", icon: TiktokLogo },
-  { href: "https://youtube.com/@himatiundiknas", label: "YouTube", icon: YoutubeLogo },
+  {
+    href: "https://www.instagram.com/hima_ti_undiknas",
+    label: "Instagram",
+    icon: InstagramLogo,
+  },
 ];
 
 export function Footer() {
@@ -41,7 +41,11 @@ export function Footer() {
                 e.preventDefault();
                 window.scrollTo({ top: 0, behavior: "smooth" });
                 if (window.location.hash) {
-                  window.history.replaceState(null, "", window.location.pathname);
+                  window.history.replaceState(
+                    null,
+                    "",
+                    window.location.pathname,
+                  );
                 }
               }
             }}
@@ -58,13 +62,15 @@ export function Footer() {
           </Link>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
             Himpunan Mahasiswa Teknologi Informasi, Universitas Pendidikan
-            Nasional. Organisasi kemahasiswaan pengembang keahlian teknologi
-            dan kepemimpinan mahasiswa TI.
+            Nasional. Organisasi kemahasiswaan pengembang keahlian teknologi dan
+            kepemimpinan mahasiswa TI.
           </p>
         </div>
 
         <div>
-          <p className="font-heading text-sm font-semibold text-white">Jelajahi</p>
+          <p className="font-heading text-sm font-semibold text-white">
+            Jelajahi
+          </p>
           <ul className="mt-4 space-y-3 text-sm text-white/60">
             {exploreLinks.map((item) => (
               <li key={item.id}>
@@ -84,19 +90,25 @@ export function Footer() {
         </div>
 
         <div>
-          <p className="font-heading text-sm font-semibold text-white">Kontak</p>
+          <p className="font-heading text-sm font-semibold text-white">
+            Kontak
+          </p>
           <ul className="mt-4 space-y-3 text-sm text-white/60">
             <li className="flex items-start gap-2.5">
               <MapPin size={18} className="mt-0.5 shrink-0 text-amber-400" />
-              Kampus Undiknas, Denpasar, Bali
+              Jl. Bedugul No.39, Sidakarya, Kec. Denpasar Sel., Kota Denpasar,
+              Bali, Denpasar, Bali, Indonesia 80224
             </li>
             <li className="flex items-start gap-2.5">
-              <EnvelopeSimple size={18} className="mt-0.5 shrink-0 text-amber-400" />
+              <EnvelopeSimple
+                size={18}
+                className="mt-0.5 shrink-0 text-amber-400"
+              />
               <a
-                href="mailto:himati@undiknas.ac.id"
+                href="mailto:himaprodi.ti.undiknas@gmail.com"
                 className="transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
               >
-                himati@undiknas.ac.id
+                himaprodi.ti.undiknas@gmail.com
               </a>
             </li>
           </ul>
@@ -120,7 +132,8 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <p className="mx-auto max-w-6xl px-6 py-5 text-xs text-white/40">
-          &copy; {new Date().getFullYear()} HIMA TI Undiknas. Seluruh hak cipta dilindungi.
+          &copy; {new Date().getFullYear()} HIMA TI Undiknas. Seluruh hak cipta
+          dilindungi.
         </p>
       </div>
     </footer>
