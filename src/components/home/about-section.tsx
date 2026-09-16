@@ -44,19 +44,13 @@ export function AboutSection() {
             <BalineseDivider className="justify-start py-2 -ml-2 sm:-ml-4" />
           </Reveal>
           <Reveal delay={120}>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-zinc-600">
-              <span className="font-semibold text-zinc-900">
-                Himpunan Mahasiswa Teknologi Informasi (HIMA TI)
-              </span>{" "}
-              adalah organisasi kemahasiswaan Program Studi Teknologi Informasi
-              Universitas Pendidikan Nasional (Undiknas), Denpasar.
+            <p className="mt-4 text-base leading-relaxed text-zinc-600">
+              Himaprodi Teknologi Informasi adalah himpunan mahasiswa yang berfungsi sebagai wadah untuk mengkoordinasi dan memfasilitasi berbagai kegiatan mahasiswa di lingkungan Program Studi TI. Selain itu, kami juga memiliki peran penting dalam mengembangkan potensi akademik, non-akademik, serta soft skill dan hard skill melalui berbagai program kerja yang relevan dengan perkembangan teknologi.
             </p>
           </Reveal>
           <Reveal delay={200}>
-            <p className="mt-3 max-w-md text-base leading-relaxed text-zinc-600">
-              Badan Pengurus HIMA TI mengelola rangkaian program kerja akademik,
-              pengembangan keterampilan teknis mahasiswa, serta memfasilitasi
-              aspirasi mahasiswa bersama pimpinan program studi.
+            <p className="mt-3 text-base leading-relaxed text-zinc-600">
+              Tujuan utama kami adalah menciptakan lingkungan belajar yang suportif dan dinamis, di mana setiap mahasiswa dapat tumbuh, berinovasi, dan berkontribusi secara positif bagi program studi, universitas, dan masyarakat.
             </p>
           </Reveal>
 
