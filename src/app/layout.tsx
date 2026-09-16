@@ -40,11 +40,12 @@ export const metadata: Metadata = {
     "Portal resmi Himpunan Mahasiswa Program Studi Teknologi Informasi, Universitas Pendidikan Nasional (Undiknas), Denpasar, Bali.",
   icons: {
     icon: [
-      { url: "/brand/logo-emblem.png", type: "image/png" },
+      { url: "/brand/favicon-square.png", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
     ],
-    shortcut: ["/brand/logo-emblem.png"],
+    shortcut: ["/brand/favicon-square.png"],
     apple: [
-      { url: "/brand/logo-emblem.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
 };
