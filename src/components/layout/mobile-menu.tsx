@@ -1,19 +1,28 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { List, X } from "@phosphor-icons/react/dist/ssr";
+import { scrollToSection } from "@/lib/smooth-scroll";
 
 const navLinks = [
-  { href: "/#about", label: "Tentang" },
-  { href: "/#program-kerja", label: "Program Kerja" },
-  { href: "/#fungsionaris", label: "Fungsionaris" },
-  { href: "/#galeri", label: "Galeri" },
-  { href: "/#kontak", label: "Kontak" },
+  { id: "about", label: "Tentang" },
+  { id: "program-kerja", label: "Program Kerja" },
+  { id: "fungsionaris", label: "Fungsionaris" },
+  { id: "galeri", label: "Galeri" },
+  { id: "kontak", label: "Kontak" },
 ];
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLinkClick = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    setOpen(false);
+    scrollToSection(id, pathname, router);
+  };
 
   return (
     <div className="md:hidden">
@@ -35,24 +44,24 @@ export function MobileMenu() {
         <div className="absolute inset-x-0 top-16 border-t border-white/10 bg-zinc-950">
           <ul className="flex flex-col px-6 py-4 text-sm font-medium">
             {navLinks.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={() => setOpen(false)}
+              <li key={item.id}>
+                <a
+                  href={`/#${item.id}`}
+                  onClick={(e) => handleLinkClick(e, item.id)}
                   className="block py-3 text-white/90 transition-colors hover:text-amber-400"
                 >
                   {item.label}
-                </Link>
+                </a>
               </li>
             ))}
             <li className="pt-3">
-              <Link
-                href="/#pendaftaran"
-                onClick={() => setOpen(false)}
-                className="block rounded-full bg-amber-400 px-5 py-2.5 text-center text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-300"
+              <button
+                type="button"
+                onClick={(e) => handleLinkClick(e, "pendaftaran")}
+                className="block w-full rounded-full bg-amber-400 px-5 py-2.5 text-center text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-300"
               >
                 Gabung
-              </Link>
+              </button>
             </li>
           </ul>
         </div>
