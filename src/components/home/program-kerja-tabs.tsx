@@ -12,7 +12,10 @@ import {
   Info,
 } from "@phosphor-icons/react/dist/ssr";
 import { motion, AnimatePresence } from "motion/react";
-import { ProgramModal, type ProgramItem } from "@/components/home/program-modal";
+import {
+  ProgramModal,
+  type ProgramItem,
+} from "@/components/home/program-modal";
 
 interface PeriodData {
   key: string;
@@ -32,11 +35,11 @@ const periods: PeriodData[] = [
         fullDescription:
           "Seminar tahunan berskala nasional yang menghadirkan praktisi industri terkemuka serta akademisi untuk mengupas perkembangan terkini di dunia teknologi informasi, kesiapan talenta digital, dan peluang masa depan.",
         image: "/hero/foto-3.jpg",
-        executionDate: "Kalender Akademik 2025/2026",
-        time: "Menyesuaikan Jadwal",
+        executionDate: "Tahun 2025",
+        time: "Selesai Dilaksanakan",
         location: "Auditorium Kampus Undiknas",
-        status: "upcoming",
-        statusText: "Segera Hadir",
+        status: "closed",
+        statusText: "Pendaftaran Ditutup",
       },
       {
         icon: Broadcast,
@@ -61,7 +64,12 @@ const periods: PeriodData[] = [
             "Ir. I Gusti Ngurah Darma Paramartha S.T., M.T., I.P.M. (Moderator)",
           ],
           price: "Rp 25.000 (Early Bird)",
-          benefits: ["E-Certificate", "Pengalaman & Relasi", "Wawasan Praktis AIoT", "Poin SKP A"],
+          benefits: [
+            "E-Certificate",
+            "Pengalaman & Relasi",
+            "Wawasan Praktis AIoT",
+            "Poin SKP A",
+          ],
           contactPerson: "Dhea (0818-0522-8056) / Indah (0822-1344-4798)",
         },
       },
@@ -104,9 +112,9 @@ const periods: PeriodData[] = [
         fullDescription:
           "Malam perayaan hari jadi Program Studi TI sekaligus serah terima jabatan (sertijab) kepengurusan HIMA TI periode 2024/2025 kepada penerus tongkat estafet berikutnya.",
         image: "/proker/it-versary.jpg",
-        executionDate: "Tahun 2024",
+        executionDate: "Tahun 2025",
         time: "Selesai Dilaksanakan",
-        location: "Auditorium Undiknas",
+        location: "Jyooty Villa, Nusa Dua",
         status: "closed",
         statusText: "Pendaftaran Ditutup",
       },
@@ -117,7 +125,7 @@ const periods: PeriodData[] = [
         fullDescription:
           "Seminar nasional inspiratif yang mempertemukan mahasiswa dengan pembicara berpengalaman nasional dalam memahami dinamika dan ekosistem industri teknologi modern.",
         image: "/proker/seminar-nasional.jpg",
-        executionDate: "Tahun 2024",
+        executionDate: "Tahun 2025",
         time: "Selesai Dilaksanakan",
         location: "Auditorium Undiknas",
         status: "closed",
@@ -130,9 +138,9 @@ const periods: PeriodData[] = [
         fullDescription:
           "Aksi sosial mahasiswa TI yang berfokus pada pendampingan masyarakat dan kepedulian lingkungan sekitar guna mempererat relasi mahasiswa dengan warga lokal.",
         image: "/proker/kersos-2025.jpg",
-        executionDate: "Tahun 2024/2025",
+        executionDate: "Tahun 2025",
         time: "Selesai Dilaksanakan",
-        location: "Denpasar, Bali",
+        location: "SMAN 2 Denpasar",
         status: "closed",
         statusText: "Pendaftaran Ditutup",
       },
@@ -143,9 +151,9 @@ const periods: PeriodData[] = [
         fullDescription:
           "Pelatihan intensif hands-on pemrograman dan pemecahan masalah algoritma untuk meningkatkan kompetensi teknis mahasiswa TI menghadapi kebutuhan industri digital.",
         image: "/proker/it-bootcamp.webp",
-        executionDate: "Tahun 2024/2025",
+        executionDate: "Tahun 2025",
         time: "Selesai Dilaksanakan",
-        location: "Laboratorium Komputer Undiknas",
+        location: "Agro Puncak Lestari, Bedugul",
         status: "closed",
         statusText: "Pendaftaran Ditutup",
       },
@@ -155,7 +163,9 @@ const periods: PeriodData[] = [
 
 export function ProgramKerjaTabs() {
   const [active, setActive] = useState(periods[0].key);
-  const [selectedProgram, setSelectedProgram] = useState<ProgramItem | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<ProgramItem | null>(
+    null,
+  );
 
   const current = periods.find((p) => p.key === active) ?? periods[0];
 
@@ -173,7 +183,9 @@ export function ProgramKerjaTabs() {
                 onClick={() => setActive(period.key)}
                 aria-pressed={isSelected}
                 className={`relative z-10 rounded-full px-6 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
-                  isSelected ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-900"
+                  isSelected
+                    ? "text-zinc-950"
+                    : "text-zinc-500 hover:text-zinc-900"
                 }`}
               >
                 {isSelected && (
@@ -208,7 +220,11 @@ export function ProgramKerjaTabs() {
                 onClick={() => setSelectedProgram(program)}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                transition={{
+                  duration: 0.4,
+                  delay: i * 0.08,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
                 className="group relative aspect-[3/4] w-full cursor-pointer overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-900 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
                 aria-haspopup="dialog"
                 aria-label={`Lihat rincian program ${program.title}`}
@@ -229,8 +245,8 @@ export function ProgramKerjaTabs() {
                       program.status === "open"
                         ? "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40"
                         : program.status === "upcoming"
-                        ? "bg-amber-950/80 text-amber-300 border border-amber-500/40"
-                        : "bg-zinc-900/85 text-zinc-300 border border-zinc-700/50"
+                          ? "bg-amber-950/80 text-amber-300 border border-amber-500/40"
+                          : "bg-zinc-900/85 text-zinc-300 border border-zinc-700/50"
                     }`}
                   >
                     <span
@@ -238,8 +254,8 @@ export function ProgramKerjaTabs() {
                         program.status === "open"
                           ? "bg-emerald-400 animate-pulse"
                           : program.status === "upcoming"
-                          ? "bg-amber-400"
-                          : "bg-zinc-400"
+                            ? "bg-amber-400"
+                            : "bg-zinc-400"
                       }`}
                     />
                     {program.statusText}
@@ -268,7 +284,11 @@ export function ProgramKerjaTabs() {
                 onClick={() => setSelectedProgram(program)}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                transition={{
+                  duration: 0.4,
+                  delay: i * 0.08,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
                 className="group relative flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 text-center shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/50 hover:shadow-xl hover:shadow-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
                 aria-haspopup="dialog"
                 aria-label={`Lihat rincian program ${program.title}`}
@@ -280,8 +300,8 @@ export function ProgramKerjaTabs() {
                       program.status === "open"
                         ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                         : program.status === "upcoming"
-                        ? "bg-amber-50 text-amber-900 border border-amber-200"
-                        : "bg-zinc-100 text-zinc-700 border border-zinc-200"
+                          ? "bg-amber-50 text-amber-900 border border-amber-200"
+                          : "bg-zinc-100 text-zinc-700 border border-zinc-200"
                     }`}
                   >
                     <span
@@ -289,8 +309,8 @@ export function ProgramKerjaTabs() {
                         program.status === "open"
                           ? "bg-emerald-500 animate-pulse"
                           : program.status === "upcoming"
-                          ? "bg-amber-500"
-                          : "bg-zinc-400"
+                            ? "bg-amber-500"
+                            : "bg-zinc-400"
                       }`}
                     />
                     {program.statusText}
@@ -319,7 +339,11 @@ export function ProgramKerjaTabs() {
                 <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-zinc-900 transition-colors group-hover:text-amber-600">
                   <Info size={14} weight="bold" className="text-amber-500" />
                   Lihat Detail
-                  <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-1" />
+                  <ArrowRight
+                    size={13}
+                    weight="bold"
+                    className="transition-transform group-hover:translate-x-1"
+                  />
                 </span>
               </motion.button>
             ),
