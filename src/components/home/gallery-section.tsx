@@ -32,41 +32,43 @@ export function GallerySection() {
 
         {/* Preview grid */}
         {!showAll && (
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:grid-rows-2">
+          <div className="mt-10 grid grid-cols-2 gap-3.5 sm:grid-cols-4 sm:grid-rows-2">
             {previewPhotos.map((photo, i) => (
               <Reveal
                 key={photo.src}
                 delay={120 + i * 80}
-                className={`relative h-0 w-full overflow-hidden rounded-xl pt-[100%] ${photo.className}`}
+                className={`group relative h-0 w-full overflow-hidden rounded-2xl border border-zinc-200/80 pt-[100%] shadow-sm transition-all duration-300 hover:border-amber-400/50 hover:shadow-lg hover:shadow-zinc-300/40 ${photo.className}`}
               >
                 <Image
                   src={photo.src}
                   alt="Dokumentasi kegiatan HIMA TI"
                   fill
                   sizes="(min-width: 640px) 25vw, 50vw"
-                  className="object-cover transition-transform duration-500 hover:scale-105"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
               </Reveal>
             ))}
           </div>
         )}
 
-        {/* Full grid */}
+        {/* Full grid with AnimatePresence */}
         {showAll && (
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
             {allPhotos.map((src, i) => (
               <Reveal
                 key={src}
-                delay={60 + i * 40}
-                className="relative h-0 w-full overflow-hidden rounded-xl pt-[100%]"
+                delay={40 + i * 30}
+                className="group relative h-0 w-full overflow-hidden rounded-2xl border border-zinc-200/80 pt-[100%] shadow-sm transition-all duration-300 hover:border-amber-400/50 hover:shadow-lg hover:shadow-zinc-300/40"
               >
                 <Image
                   src={src}
                   alt="Dokumentasi kegiatan HIMA TI"
                   fill
                   sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-                  className="object-cover transition-transform duration-500 hover:scale-105"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
               </Reveal>
             ))}
           </div>
@@ -76,7 +78,7 @@ export function GallerySection() {
           <button
             type="button"
             onClick={() => setShowAll((prev) => !prev)}
-            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-[0_0_32px_-6px_rgba(251,191,36,0.55)] transition-all hover:bg-amber-300 hover:shadow-[0_0_40px_-4px_rgba(251,191,36,0.75)]"
+            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-sm font-bold text-zinc-950 shadow-[0_0_32px_-6px_rgba(251,191,36,0.55)] transition-all duration-200 hover:bg-amber-300 hover:shadow-[0_0_40px_-4px_rgba(251,191,36,0.8)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
           >
             {showAll ? "Sembunyikan" : "Lihat Semua Foto"}
             <svg
