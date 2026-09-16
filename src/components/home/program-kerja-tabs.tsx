@@ -21,7 +21,7 @@ const periods = [
         icon: Microphone,
         title: "Seminar Nasional",
         body: "Pembicara nasional membahas tren teknologi informasi.",
-        image: "/proker/seminar-nasional.jpg",
+        image: "/hero/foto-3.jpg",
       },
       {
         icon: Broadcast,
