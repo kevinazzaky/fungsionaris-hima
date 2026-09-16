@@ -46,9 +46,12 @@ export default function AboutPage() {
         </div>
 
         <div className="mt-10 max-w-2xl">
-          <h2 className="text-2xl font-bold text-zinc-900">Sejarah &amp; Peran Organisasi</h2>
+          <h2 className="text-2xl font-bold text-zinc-900">Peran &amp; Tujuan Organisasi</h2>
           <p className="mt-4 text-base leading-relaxed text-zinc-600">
-            Himpunan Mahasiswa Teknologi Informasi (HIMA TI) didirikan sebagai badan perwakilan mahasiswa Program Studi Teknologi Informasi di lingkungan Universitas Pendidikan Nasional, Denpasar. Organisasi ini mengoordinasikan berbagai kegiatan akademik, lokakarya teknologi, kompetisi bidang IT, dan program pengabdian masyarakat yang melibatkan mahasiswa aktif di setiap angkatan.
+            Himaprodi Teknologi Informasi adalah himpunan mahasiswa yang berfungsi sebagai wadah untuk mengkoordinasi dan memfasilitasi berbagai kegiatan mahasiswa di lingkungan Program Studi TI. Selain itu, kami juga memiliki peran penting dalam mengembangkan potensi akademik, non-akademik, serta soft skill dan hard skill melalui berbagai program kerja yang relevan dengan perkembangan teknologi.
+          </p>
+          <p className="mt-3 text-base leading-relaxed text-zinc-600">
+            Tujuan utama kami adalah menciptakan lingkungan belajar yang suportif dan dinamis, di mana setiap mahasiswa dapat tumbuh, berinovasi, dan berkontribusi secara positif bagi program studi, universitas, dan masyarakat.
           </p>
         </div>
 
