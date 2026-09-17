@@ -109,6 +109,10 @@ Aplikasi mengadopsi pola arsitektur **Next.js App Router (React Server Component
   * Rute API `/api/pendaftaran` mengembalikan HTTP status 403 (Forbidden) secara otomatis.
 * **Kondisi Terbuka (Registration Open):**
   * Menampilkan formulir pendaftaran interaktif (`RegistrationForm`) dengan validasi nama, NIM, angkatan, pilihan divisi (minimal 2 divisi), dan upload berkas PDF (maksimal 10 MB).
+* **Alur Pendaftaran (3 Tahap):**
+  1. **Isi Formulir:** Calon pendaftar melengkapi data diri dan memilih minimal 2 divisi yang diminati.
+  2. **Gabung Grup LINE:** Setelah formulir terkirim, pendaftar mendapatkan tautan grup LINE resmi tempat seluruh informasi tahapan selanjutnya diinfokan.
+  3. **Wawancara:** Sesi wawancara singkat bersama tim pengurus HIMA TI.
 * **Rute Ekspor Data Administrasi (`/api/pendaftaran/export`):**
   * Menyediakan endpoint serverless untuk mengekspor seluruh data pendaftar fungsionaris ke dalam berkas Excel (`.xlsx`) berformat rapi.
 
