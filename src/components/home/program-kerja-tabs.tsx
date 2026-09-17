@@ -33,7 +33,7 @@ const periods: PeriodData[] = [
         title: "Seminar Nasional",
         body: "Pembicara nasional membahas tren teknologi informasi terkini.",
         fullDescription:
-          "Seminar tahunan berskala nasional yang menghadirkan praktisi industri terkemuka serta akademisi untuk mengupas perkembangan terkini di dunia teknologi informasi, kesiapan talenta digital, dan peluang masa depan.",
+          "Kegiatan untuk memperluas pengetahuan dan wawasan mahasiswa mengenai perkembangan di bidang Teknologi Informasi. Seminar ini mendorong pertukaran ide dan inovasi, serta mendukung peningkatan kualitas pendidikan dengan menghadirkan narasumber yang kompeten.",
         image: "/hero/foto-3.jpg",
         executionDate: "Tahun 2025",
         time: "Selesai Dilaksanakan",
@@ -78,7 +78,7 @@ const periods: PeriodData[] = [
         title: "Kerja Sosial",
         body: "Pengabdian masyarakat di lingkungan sekitar kampus.",
         fullDescription:
-          "Program kepedulian sosial dan bakti kemasyarakatan nyata mahasiswa Teknologi Informasi untuk memberikan kontribusi positif melalui edukasi teknologi, aksi peduli sosial, dan pendampingan masyarakat.",
+          "Bertujuan meningkatkan rasa kepedulian mahasiswa terhadap kehidupan sosial masyarakat, dengan membantu memberikan solusi aplikatif berdasarkan wawasan dan ilmu mahasiswa, sekaligus memperkuat hubungan antara mahasiswa dan masyarakat.",
         image: null,
         executionDate: "Semester Genap 2025/2026",
         time: "Menyesuaikan Jadwal",
@@ -93,7 +93,7 @@ const periods: PeriodData[] = [
         fullDescription:
           "Peringatan hari jadi Program Studi Teknologi Informasi yang dirayakan melalui rangkaian kompetisi inovasi mahasiswa, pameran karya teknologi, pentas ekspresi seni, dan keakraban seluruh civitas akademika.",
         image: null,
-        executionDate: "Dies Natalis TI 2026",
+        executionDate: "Semester Genap 2025/2026",
         time: "Menyesuaikan Jadwal",
         location: "Kampus Undiknas Denpasar",
         status: "upcoming",
