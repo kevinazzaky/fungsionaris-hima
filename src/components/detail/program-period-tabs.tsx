@@ -19,7 +19,7 @@ const periods = [
       {
         icon: Microphone,
         title: "Seminar Nasional",
-        body: "Seminar dengan pembicara nasional membahas tren dan isu terkini teknologi informasi.",
+        body: "Kegiatan untuk memperluas pengetahuan dan wawasan mahasiswa mengenai perkembangan di bidang Teknologi Informasi. Seminar ini mendorong pertukaran ide dan inovasi, serta mendukung peningkatan kualitas pendidikan dengan menghadirkan narasumber yang kompeten.",
         image: "/hero/foto-3.jpg",
       },
       {
@@ -31,7 +31,7 @@ const periods = [
       {
         icon: HandHeart,
         title: "Kerja Sosial",
-        body: "Pengabdian masyarakat lewat edukasi dan kegiatan sosial di lingkungan sekitar kampus.",
+        body: "Bertujuan meningkatkan rasa kepedulian mahasiswa terhadap kehidupan sosial masyarakat, dengan membantu memberikan solusi aplikatif berdasarkan wawasan dan ilmu mahasiswa, sekaligus memperkuat hubungan antara mahasiswa dan masyarakat.",
         image: null,
       },
       {
