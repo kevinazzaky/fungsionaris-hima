@@ -12,8 +12,8 @@ export default function Home() {
       <SectionScroller />
       <Hero />
       <AboutSection />
-      <ProgramKerjaSection />
       <FungsionarisSection />
+      <ProgramKerjaSection />
       <GallerySection />
       <PendaftaranSection />
     </>
