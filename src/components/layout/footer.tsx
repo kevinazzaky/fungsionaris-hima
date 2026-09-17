@@ -12,8 +12,8 @@ import { scrollToSection } from "@/lib/smooth-scroll";
 
 const exploreLinks = [
   { id: "about", label: "Tentang" },
-  { id: "program-kerja", label: "Program Kerja" },
   { id: "fungsionaris", label: "Fungsionaris" },
+  { id: "program-kerja", label: "Program Kerja" },
   { id: "galeri", label: "Galeri" },
   { id: "pendaftaran", label: "Pendaftaran" },
 ];
