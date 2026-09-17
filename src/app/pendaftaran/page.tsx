@@ -22,15 +22,15 @@ const alur = [
   },
   {
     step: "02",
-    icon: ChatCircleText,
-    title: "Wawancara",
-    body: "Sesi wawancara singkat bersama tim pengurus HIMA TI.",
+    icon: Megaphone,
+    title: "Gabung Grup LINE",
+    body: "Setelah mengisi formulir, kamu akan mendapatkan link untuk bergabung ke grup LINE resmi. Seluruh informasi tahapan selanjutnya akan diinfokan di sana.",
   },
   {
     step: "03",
-    icon: Megaphone,
-    title: "Gabung Grup LINE",
-    body: "Setelah mengisi formulir, kamu akan mendapatkan link untuk bergabung ke grup LINE resmi.",
+    icon: ChatCircleText,
+    title: "Wawancara",
+    body: "Sesi wawancara singkat bersama tim pengurus HIMA TI.",
   },
 ];
 
