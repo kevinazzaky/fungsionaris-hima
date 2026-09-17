@@ -9,8 +9,8 @@ import { scrollToSection } from "@/lib/smooth-scroll";
 
 const navLinks = [
   { id: "about", label: "Tentang" },
-  { id: "program-kerja", label: "Program Kerja" },
   { id: "fungsionaris", label: "Fungsionaris" },
+  { id: "program-kerja", label: "Program Kerja" },
   { id: "galeri", label: "Galeri" },
   { id: "kontak", label: "Kontak" },
 ];
