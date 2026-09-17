@@ -6,7 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   EnvelopeSimple,
   InstagramLogo,
+  InstagramLogoIcon,
   MapPin,
+  YoutubeLogoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { scrollToSection } from "@/lib/smooth-scroll";
 
@@ -22,7 +24,12 @@ const socials = [
   {
     href: "https://www.instagram.com/hima_ti_undiknas",
     label: "Instagram",
-    icon: InstagramLogo,
+    icon: InstagramLogoIcon,
+  },
+  {
+    href: "https://www.youtube.com/@himaproditiundiknas",
+    label: "Youtube",
+    icon: YoutubeLogoIcon,
   },
 ];
 

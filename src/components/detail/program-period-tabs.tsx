@@ -23,6 +23,12 @@ const periods = [
         image: "/hero/foto-3.jpg",
       },
       {
+        icon: Code,
+        title: "Workshop Web Development",
+        body: "Pelatihan intensif 16 kali pertemuan untuk mempelajari dasar-dasar pemrograman website modern, mulai dari HTML, CSS, JavaScript, PHP, hingga version control Git & GitHub.",
+        image: "/proker/workshop-webdev.jpg",
+      },
+      {
         icon: Broadcast,
         title: "Webinar Nasional",
         body: "Diskusi daring bersama praktisi dan akademisi seputar dunia teknologi.",
