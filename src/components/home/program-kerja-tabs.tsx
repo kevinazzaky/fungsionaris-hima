@@ -210,11 +210,16 @@ export function ProgramKerjaTabs() {
     }
   }, [current.programs.length]);
 
-  useEffect(() => {
+  const handleTabChange = (key: string) => {
+    setActive(key);
     setActiveIndex(0);
     setCanScrollLeft(false);
     setCanScrollRight(true);
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTo({ left: 0, behavior: "instant" });
+  };
 
+  useEffect(() => {
     const timer = setTimeout(() => {
       checkScroll();
     }, 100);
@@ -262,7 +267,7 @@ export function ProgramKerjaTabs() {
               <button
                 key={period.key}
                 type="button"
-                onClick={() => setActive(period.key)}
+                onClick={() => handleTabChange(period.key)}
                 aria-pressed={isSelected}
                 className={`relative z-10 rounded-full px-6 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                   isSelected
