@@ -4,7 +4,7 @@
  * Perubahan di sini otomatis sinkron ke landing page dan halaman pendaftaran.
  */
 
-export const REGISTRATION_OPEN = false;
+export const REGISTRATION_OPEN = true;
 
 export const REGISTRATION_CONFIG = {
   isOpen: REGISTRATION_OPEN,
