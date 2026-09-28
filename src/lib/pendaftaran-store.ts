@@ -1,14 +1,22 @@
-// Simple in-memory store for pendaftaran submissions
-// In production, replace with a database
+// In-memory store for pendaftaran submissions and Google Sheets synchronization
 
 export type Pendaftaran = {
   id: string;
   nama: string;
   nim: string;
   angkatan: string;
+  tempatTanggalLahir: string;
+  jenisKelamin: string;
+  alamat: string;
+  noHp: string;
+  idLine: string;
+  pengalamanOrganisasi: string;
+  minatSkill: string;
+  alasanBergabung: string;
   divisi: string;
-  berkas: string; // filename
-  berkasSize: number;
+  alasanDivisi: string;
+  berkas?: string; // filename
+  berkasSize?: number;
   submittedAt: string;
 };
 
