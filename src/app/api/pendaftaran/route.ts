@@ -78,13 +78,18 @@ export async function POST(request: Request) {
       berkasSize,
     });
 
-    // ── Kirim ke Google Spreadsheet Webhook jika URL tersedia ──
-    const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+    // ── Kirim ke Google Spreadsheet Webhook ──
+    const DEFAULT_WEBHOOK_URL =
+      "https://script.google.com/macros/s/AKfycbxpXV_zcvGmp4dDlaC165zYCMeUXlHw6zgOv8lYmwkohPGAiIHnfHdVrqZjg0Nzc7E8/exec";
+    const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
+
     if (webhookUrl) {
       try {
-        await fetch(webhookUrl, {
+        const sheetResponse = await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          redirect: "follow",
+          signal: AbortSignal.timeout(10000),
           body: JSON.stringify({
             timestamp: new Date().toISOString(),
             nama,
@@ -103,6 +108,14 @@ export async function POST(request: Request) {
             berkas: berkasName,
           }),
         });
+
+        if (!sheetResponse.ok) {
+          console.error(
+            `Google Sheets webhook error: status ${sheetResponse.status} ${sheetResponse.statusText}`,
+          );
+        } else {
+          console.log("Data pendaftaran berhasil diteruskan ke Google Sheets Webhook.");
+        }
       } catch (err) {
         console.error("Gagal mengirim data ke Google Sheets Webhook:", err);
         // Tetap lanjutkan respons berhasil karena data tersimpan lokal
