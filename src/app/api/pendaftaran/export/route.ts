@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   // ── Proteksi: hanya yang punya key bisa download ──────────────────────────
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key");
-  const validKey = process.env.EXPORT_SECRET_KEY;
+  const DEFAULT_EXPORT_KEY = "himati_undiknas_secret_2026";
+  const validKey = process.env.EXPORT_SECRET_KEY || DEFAULT_EXPORT_KEY;
 
   if (!validKey || key !== validKey) {
     return new Response(
