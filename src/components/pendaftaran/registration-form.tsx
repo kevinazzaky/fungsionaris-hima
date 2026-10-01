@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   ArrowRight,
   Briefcase,
+  Camera,
   CheckCircle,
   Eye,
   IdentificationCard,
@@ -34,12 +35,16 @@ export function RegistrationForm() {
   const [selectedDivisi, setSelectedDivisi] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [submittedData, setSubmittedData] = useState<RegistrationDocumentData | null>(null);
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const MAX_MB = 10;
   const MAX_BYTES = MAX_MB * 1024 * 1024;
+  const MAX_FOTO_MB = 5;
 
   function toggleDivisi(id: string) {
     setSelectedDivisi((prev) =>
@@ -56,6 +61,26 @@ export function RegistrationForm() {
     }
     setFile(f);
     setErrorMsg("");
+  }
+
+  function handleFotoChange(f: File | null) {
+    if (!f) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+      setErrorMsg("Format pas foto harus berformat JPG, PNG, atau WEBP.");
+      return;
+    }
+    if (f.size > MAX_FOTO_MB * 1024 * 1024) {
+      setErrorMsg(`Ukuran pas foto melebihi ${MAX_FOTO_MB} MB.`);
+      return;
+    }
+    setErrorMsg("");
+    setFotoFile(f);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setFotoPreviewUrl((e.target?.result as string) || null);
+    };
+    reader.readAsDataURL(f);
   }
 
   function handlePrint() {
@@ -136,6 +161,7 @@ export function RegistrationForm() {
           alasanBergabung,
           divisi: divisiLabels,
           alasanDivisi,
+          fotoUrl: fotoPreviewUrl || undefined,
           tanggalDaftar: new Date().toLocaleDateString("id-ID", {
             day: "numeric",
             month: "long",
@@ -147,6 +173,8 @@ export function RegistrationForm() {
         setStatus("success");
         formRef.current?.reset();
         setFile(null);
+        setFotoFile(null);
+        if (fotoInputRef.current) fotoInputRef.current.value = "";
         setSelectedDivisi([]);
       }
     } catch {
@@ -265,6 +293,8 @@ export function RegistrationForm() {
               setStatus("idle");
               setSubmittedData(null);
               setShowPreview(false);
+              setFotoFile(null);
+              setFotoPreviewUrl(null);
             }}
             className="text-xs font-semibold text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
           >
@@ -330,6 +360,75 @@ export function RegistrationForm() {
           <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-zinc-900">
             1. Data Diri &amp; Kontak Pribadi
           </h3>
+        </div>
+
+        {/* Pas Foto 3x4 (Opsional) */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 transition-colors hover:border-amber-400/60 hover:bg-white">
+          <div className="relative flex h-28 w-[84px] shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 shadow-sm">
+            {fotoPreviewUrl ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={fotoPreviewUrl}
+                  alt="Pratinjau Pas Foto"
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFotoFile(null);
+                    setFotoPreviewUrl(null);
+                    if (fotoInputRef.current) fotoInputRef.current.value = "";
+                  }}
+                  className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black transition-colors"
+                  title="Hapus foto"
+                >
+                  <X size={12} weight="bold" />
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-zinc-400">
+                <Camera size={24} weight="bold" />
+                <span className="text-[10px] font-bold">3 x 4</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+                Pas Foto 3x4
+              </span>
+              <span className="rounded-full bg-zinc-200/80 px-2 py-0.5 text-[10px] font-medium text-zinc-600">
+                Opsional
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Unggah pas foto formal (format JPG, PNG, atau WEBP, maks. 5 MB). Foto akan langsung terpasang otomatis pada lembar formulir pendaftaran saat dicetak.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <input
+                ref={fotoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => handleFotoChange(e.target.files?.[0] ?? null)}
+              />
+              <button
+                type="button"
+                onClick={() => fotoInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50 hover:border-amber-400 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <UploadSimple size={14} weight="bold" />
+                {fotoFile ? "Ganti Foto" : "Pilih File Foto"}
+              </button>
+              {fotoFile && (
+                <span className="text-xs text-zinc-600 truncate max-w-[200px]">
+                  {fotoFile.name} ({(fotoFile.size / 1024).toFixed(0)} KB)
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Nama + NIM */}

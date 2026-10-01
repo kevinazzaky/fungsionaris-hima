@@ -17,6 +17,7 @@ export interface RegistrationDocumentData {
   alasanBergabung: string;
   divisi: string;
   alasanDivisi: string;
+  fotoUrl?: string;
   tanggalDaftar?: string;
 }
 
@@ -101,9 +102,20 @@ export function RegistrationPrintDocument({
         {/* Foto Box & Main Identity */}
         <div className="relative">
           {/* Kotak Pas Foto 3 x 4 */}
-          <div className="absolute right-0 top-0 flex h-32 w-24 flex-col items-center justify-center border border-dashed border-zinc-500 bg-zinc-50 text-[10px] font-semibold text-zinc-500 print:border-zinc-400">
-            <span>Pas Foto</span>
-            <span className="font-bold">3 x 4</span>
+          <div className="absolute right-0 top-0 flex h-32 w-24 overflow-hidden border border-zinc-400 bg-zinc-50 text-[10px] font-semibold text-zinc-500 print:border-zinc-400">
+            {data.fotoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={data.fotoUrl}
+                alt="Pas Foto 3x4"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center border border-dashed border-zinc-400">
+                <span>Pas Foto</span>
+                <span className="font-bold">3 x 4</span>
+              </div>
+            )}
           </div>
 
           {/* Identity Fields */}
@@ -220,7 +232,7 @@ export function RegistrationPrintDocument({
             <p className="mt-1">Hormat Saya,</p>
             <div className="h-16 w-full" />
             <p className="font-bold underline">
-              ({data.nama || "...................................."})
+              {data.nama || "...................................."}
             </p>
           </div>
         </div>
@@ -344,7 +356,7 @@ export function RegistrationPrintDocument({
             <p className="mt-1">Hormat Saya,</p>
             <div className="h-20 w-full" />
             <p className="font-bold underline">
-              ({data.nama || "...................................."})
+              {data.nama || "...................................."}
             </p>
           </div>
         </div>
