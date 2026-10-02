@@ -14,7 +14,7 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react/dist/ssr";
-import { DIVISI_OPTIONS } from "@/lib/pendaftaran-config";
+import { DIVISI_OPTIONS, LINE_GROUP_URL } from "@/lib/pendaftaran-config";
 import { motion, AnimatePresence } from "motion/react";
 import {
   RegistrationPrintDocument,
@@ -23,7 +23,7 @@ import {
 
 const angkatanOptions = Array.from({ length: 7 }, (_, i) => String(2020 + i));
 
-const LINE_GROUP = "https://line.me/ti/g/wJYxHe74u6";
+const LINE_GROUP = LINE_GROUP_URL;
 
 type Status = "idle" | "loading" | "success" | "error";
 
@@ -281,8 +281,8 @@ export function RegistrationForm() {
               />
             </svg>
             <div className="text-left">
-              <p className="text-sm font-bold text-zinc-900">Gabung Grup LINE HIMA TI</p>
-              <p className="text-xs text-zinc-500">Klik untuk masuk grup koordinasi seleksi</p>
+              <p className="text-sm font-bold text-zinc-900">Gabung Grup LINE Calon Fungsionaris</p>
+              <p className="text-xs text-zinc-500">Klik untuk masuk ke grup koordinasi seleksi resmi</p>
             </div>
             <ArrowRight size={16} weight="bold" className="ml-auto text-zinc-400 group-hover:translate-x-1" />
           </a>
