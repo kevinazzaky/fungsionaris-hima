@@ -6,6 +6,8 @@
 
 export const REGISTRATION_OPEN = true;
 
+export const LINE_GROUP_URL = "https://line.me/ti/g/NGMA8UNN6k";
+
 export const REGISTRATION_CONFIG = {
   isOpen: REGISTRATION_OPEN,
   statusLabel: REGISTRATION_OPEN ? "Pendaftaran Dibuka" : "Pendaftaran Ditutup",
