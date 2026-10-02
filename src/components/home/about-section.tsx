@@ -26,7 +26,7 @@ const visionMission = [
 ];
 
 const stats = [
-  { value: "180+", label: "Mahasiswa Aktif TI" },
+  { value: "100+", label: "Mahasiswa Aktif TI" },
   { value: "5", label: "Divisi Pengurus" },
   { value: "2026", label: "Periode Aktif" },
 ];
