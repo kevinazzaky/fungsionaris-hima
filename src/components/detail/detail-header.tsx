@@ -9,7 +9,7 @@ export function DetailHeader({
   description: string;
 }) {
   return (
-    <div className="bg-zinc-950 px-6 py-16 sm:py-20">
+    <div className="bg-zinc-950 px-6 py-12 sm:px-10 sm:py-14 lg:px-16">
       <div className="mx-auto max-w-4xl">
         <Link
           href="/"
@@ -18,10 +18,10 @@ export function DetailHeader({
           <ArrowLeft size={16} weight="bold" />
           Kembali ke Beranda
         </Link>
-        <h1 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
           {title}
         </h1>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-white/70">
+        <p className="mt-3 max-w-xl text-base leading-relaxed text-white/70">
           {description}
         </p>
       </div>
