@@ -198,14 +198,15 @@ export function ProgramKerjaTabs() {
     const el = scrollContainerRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
+    const atEnd = scrollLeft >= scrollWidth - clientWidth - 6;
     setCanScrollLeft(scrollLeft > 6);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
+    setCanScrollRight(!atEnd);
 
     const card = el.querySelector<HTMLElement>("[data-proker-card]");
     if (card) {
       const cardWidth = card.offsetWidth + 20;
-      const index = Math.round(scrollLeft / cardWidth);
       const maxIndex = current.programs.length - 1;
+      const index = atEnd ? maxIndex : Math.round(scrollLeft / cardWidth);
       setActiveIndex(Math.max(0, Math.min(index, maxIndex)));
     }
   }, [current.programs.length]);
