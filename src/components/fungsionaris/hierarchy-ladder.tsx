@@ -15,10 +15,11 @@ import {
 import { MemberNode } from "./member-node";
 import { BalineseCorner, BalineseDivider } from "@/components/ui/balinese-ornaments";
 
-type TabKey = "inti" | "hh" | "psdm" | "kominfo" | "semua";
+type TabKey = "inti" | "delegasi" | "hh" | "psdm" | "kominfo" | "semua";
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: "inti", label: "Pimpinan Inti" },
+  { key: "delegasi", label: "Delegasi" },
   { key: "hh", label: "Divisi HH" },
   { key: "psdm", label: "Divisi PSDM" },
   { key: "kominfo", label: "Divisi Kominfo" },
@@ -74,6 +75,18 @@ export function HierarchyLadder() {
             </motion.div>
           )}
 
+          {activeTab === "delegasi" && (
+            <motion.div
+              key="tab-delegasi"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <DelegasiLadder />
+            </motion.div>
+          )}
+
           {(activeTab === "hh" || activeTab === "psdm" || activeTab === "kominfo") && (
             <motion.div
               key={`tab-${activeTab}`}
@@ -98,6 +111,7 @@ export function HierarchyLadder() {
               className="space-y-20"
             >
               <IntiLadder />
+              <DelegasiLadder />
               <div className="border-t border-zinc-200/80 pt-16">
                 <div className="mb-14 text-center">
                   <span className="font-script text-2xl italic text-amber-500 sm:text-3xl">
@@ -126,8 +140,7 @@ export function HierarchyLadder() {
  * 1. Paling Atas: Pembina HIMA TI (Ms. Riska)
  * 2. Pimpinan Himpunan: Ketua Umum (Kevin) & Wakil Ketua (Wahyu) SEJAJAR
  * 3. Sekretaris Umum (Dedy)
- * 4. Bidang Sekretariat & Kebendaharaan
- * 5. Delegasi
+ * 4. Sekretaris & Bendahara
  */
 function IntiLadder() {
   return (
@@ -181,7 +194,7 @@ function IntiLadder() {
             <BalineseCorner position="top-right" className="top-2 right-2" size={36} />
             <div className="mb-6 border-b border-zinc-100 pb-3 text-center">
               <p className="font-heading text-sm font-bold uppercase tracking-wider text-zinc-900">
-                Bidang Sekretariat
+                Sekretaris
               </p>
               <p className="text-xs text-zinc-500 mt-0.5">Administrasi &amp; Persuratan</p>
             </div>
@@ -198,7 +211,7 @@ function IntiLadder() {
             <BalineseCorner position="top-right" className="top-2 right-2" size={36} />
             <div className="mb-6 border-b border-zinc-100 pb-3 text-center">
               <p className="font-heading text-sm font-bold uppercase tracking-wider text-zinc-900">
-                Bidang Kebendaharaan
+                Bendahara
               </p>
               <p className="text-xs text-zinc-500 mt-0.5">Keuangan &amp; Anggaran</p>
             </div>
@@ -210,26 +223,38 @@ function IntiLadder() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ── Konektor Vertikal ke Delegasi ───────────────────────────── */}
-      <div className="flex flex-col items-center my-6">
-        <div className="h-10 w-0.5 bg-gradient-to-b from-zinc-300 to-zinc-300" />
-        <div className="h-2 w-2 rounded-full bg-zinc-400" />
+/**
+ * Tangga Perwakilan & Delegasi Resmi (section tersendiri, terpisah dari Pimpinan Inti)
+ */
+function DelegasiLadder() {
+  return (
+    <div className="mx-auto flex max-w-4xl flex-col items-center">
+      <div className="text-center">
+        <span className="font-script text-xl italic text-amber-500 sm:text-2xl">
+          Delegasi
+        </span>
+        <h3 className="font-heading mt-1 text-2xl font-black uppercase tracking-tight text-zinc-900 sm:text-3xl">
+          Perwakilan &amp; Delegasi Resmi
+        </h3>
+        <BalineseDivider className="my-2" />
+        <p className="mx-auto max-w-md text-xs leading-relaxed text-zinc-500 sm:text-sm">
+          Delegasi adalah perwakilan resmi Himaprodi TI di luar organisasi,
+          bertugas menjembatani komunikasi antara Himaprodi TI dengan BPM FTI
+          serta menjaga hubungan baik dengan himpunan-himpunan mahasiswa
+          program studi lain di tingkat fakultas.
+        </p>
       </div>
 
-      {/* ── Tingkat III: Delegasi Resmi ─────────────────────────────── */}
-      <div className="w-full flex flex-col items-center">
-        <span className="mb-6 rounded-full border border-zinc-200 bg-white px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500 shadow-sm">
-          Perwakilan &amp; Delegasi Resmi
-        </span>
-
-        <div className="group relative flex flex-wrap justify-center gap-8 sm:gap-14 rounded-3xl border border-zinc-200/80 bg-white px-8 py-6 shadow-sm">
-          <BalineseCorner position="top-left" className="top-2 left-2" size={36} />
-          <BalineseCorner position="top-right" className="top-2 right-2" size={36} />
-          {DELEGASI.map((p) => (
-            <MemberNode key={p.name} person={p} size="md" />
-          ))}
-        </div>
+      <div className="group relative mt-8 flex flex-wrap justify-center gap-8 sm:gap-14 rounded-3xl border border-zinc-200/80 bg-white px-8 py-6 shadow-sm">
+        <BalineseCorner position="top-left" className="top-2 left-2" size={36} />
+        <BalineseCorner position="top-right" className="top-2 right-2" size={36} />
+        {DELEGASI.map((p) => (
+          <MemberNode key={p.name} person={p} size="md" />
+        ))}
       </div>
     </div>
   );
