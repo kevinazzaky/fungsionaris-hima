@@ -4,7 +4,7 @@
  * Perubahan di sini otomatis sinkron ke landing page dan halaman pendaftaran.
  */
 
-export const REGISTRATION_OPEN = true;
+export const REGISTRATION_OPEN = false;
 
 export const LINE_GROUP_URL = "https://line.me/ti/g/NGMA8UNN6k";
 
