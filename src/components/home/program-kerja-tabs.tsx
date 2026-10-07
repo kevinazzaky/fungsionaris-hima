@@ -73,8 +73,8 @@ const periods: PeriodData[] = [
         executionDate: "03 Oktober 2026",
         time: "09:30 WITA",
         location: "Daring via Zoom Meeting",
-        status: "open",
-        statusText: "Pendaftaran Masih Dibuka",
+        status: "closed",
+        statusText: "Pendaftaran Ditutup",
         gformLink:
           "https://docs.google.com/forms/d/e/1FAIpQLSe07p0vZgjx1W1NzMpBUGsXfh6TuUE9s6SCmb8aLVM-F8QZnw/viewform",
         extraDetails: {
