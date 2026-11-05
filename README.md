@@ -170,7 +170,7 @@ Prisma Client dihasilkan ke `src/generated/prisma` dan tidak disimpan di Git. Pe
 
 ## Verifikasi dan batas yang diketahui
 
-Catatan QA terakhir, **5 November 2026**: **48 tes, lint dan build lolos**. Browser memverifikasi Auth, perubahan password, pengelolaan pendaftar, hero/program kerja, periode, buka/tutup penerimaan, popup editor dan navigasi mobile. Rincian skenario, penggunaan API mock dan batas pengujian ada pada [QA_ADMIN.md](docs/QA_ADMIN.md).
+Catatan QA terakhir, **5 November 2026**: **49 tes, lint dan build lolos**. Build juga diuji tanpa konfigurasi Supabase untuk mencegah regresi prerender halaman admin. Browser memverifikasi Auth, perubahan password, pengelolaan pendaftar, hero/program kerja, periode, buka/tutup penerimaan, popup editor dan navigasi mobile. Rincian skenario, penggunaan API mock dan batas pengujian ada pada [QA_ADMIN.md](docs/QA_ADMIN.md).
 
 - CRUD fungsionaris/galeri sudah diuji dengan API mock; alur hero/program dan Storage publik diuji pada Supabase asli. Upload/unduh PDF privat cloud belum diuji menyeluruh.
 - Foto calon pendaftar belum dipersistensikan. Cetak ulang admin tidak dapat memulihkan foto/tanda tangan yang tidak tersimpan.

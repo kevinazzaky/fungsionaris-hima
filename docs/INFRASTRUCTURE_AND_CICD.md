@@ -146,6 +146,10 @@ graphify update .
 
 Tambahkan konfigurasi yang sama ke environment deployment. `npm run build` menghasilkan Prisma Client sebelum Next.js dikompilasi. Jalankan `npm run db:migrate` sebagai langkah deployment terpisah sebelum merilis kode; jangan menjalankan migrasi dari request pengguna. Environment preview menggunakan database terpisah dari produksi. Pada Vercel, upload 3 MB dipilih agar payload multipart tetap di bawah batas request fungsi 4.5 MB.
 
+Pada Vercel, isi variabel dari `.env.example` melalui pengaturan Environment Variables dan pilih cakupan **Preview** untuk deployment PR serta **Production** untuk rilis. `.env.local` tidak dikirim melalui Git. Setelah mengubah environment, deploy ulang agar build memakai konfigurasi terbaru. Sesuaikan URL situs dengan environment yang digunakan.
+
+Helper autentikasi menunggu request menggunakan `connection()` sebelum memeriksa konfigurasi atau sesi. Halaman admin tidak diprerender saat build, termasuk ketika konfigurasi backend belum lengkap. Build tetap dapat selesai tanpa Supabase; akses admin diarahkan ke login dan login menampilkan petunjuk setup. Konfigurasi Supabase yang valid tetap diperlukan untuk menggunakan backend.
+
 Tes lokal mencakup pemetaan spreadsheet, duplikasi per periode, penyusunan surat, validasi input, kompensasi upload saat database gagal, dan migration/RLS pada PGlite. Login dan migrasi data asli sudah diuji pada Supabase. Setelah setup bucket, lanjutkan uji akun non-admin, CRUD foto, publikasi di halaman publik, kirim pendaftaran dan restart server, serta unduh lampiran privat. Hasil dan batas verifikasi ada di [QA_ADMIN.md](QA_ADMIN.md).
 
 ## Jika server masih memakai versi lama

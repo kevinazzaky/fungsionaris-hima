@@ -210,3 +210,11 @@ Foto opsional calon pendaftar masih hanya dipakai untuk preview/cetak browser. P
 - Mock kegagalan PATCH 503 mempertahankan nilai switch sebelumnya, menampilkan error dan pulih melalui Muat ulang status. Layout pada 360/768/1440 px tidak overflow; tidak ada pageerror. Semua pengujian memulihkan status awal dan mempertahankan empat pendaftar.
 - RLS/privilege diverifikasi cloud; PGlite menguji row awal, larangan singleton lain, perubahan flag dan delapan tabel RLS. Tiga tes baru memeriksa boolean eksplisit, penolakan input ambigu, kegagalan simpan serta copy periode/status.
 - Antislop R-03/R-24/R-26/R-27/R-32/R-35/C-1/C-2 PASS: switch native berlabel/aria-checked, teks status langsung, tap target 44 px, palet/dials admin dipertahankan. Total 48 tes, lint, build dan Graphify AST lolos; parser SQL Graphify masih belum tersedia.
+
+## Regresi build Preview tanpa konfigurasi Supabase
+
+- Error Vercel pada `/admin/akun` direproduksi dengan mengosongkan lima variabel koneksi/Auth/Storage hanya pada proses build, tanpa mengubah `.env.local`. Build lama gagal pada `requireAdmin()` karena guard konfigurasi mengembalikan null sebelum Next.js membaca cookie request.
+- `getAdmin()` kini menunggu `connection()` sebelum guard konfigurasi, sehingga seluruh pemanggil memakai autentikasi saat request. Pemeriksaan sesi dan allowlist tetap berlaku.
+- Tes regresi gagal pada implementasi lama dan lulus setelah perbaikan: tidak ada pembacaan konfigurasi sebelum request, backend yang belum dikonfigurasi tidak memanggil Auth/database, dan `requireAdmin()` tetap menolak akses.
+- Build tanpa konfigurasi Supabase lulus. Server produksi hasil build mengarahkan `/admin`, `/admin/akun`, `/admin/galeri` dan `/admin/program-kerja` ke login (307); API pendaftar/ekspor tetap menolak akses (401), dan login menampilkan petunjuk setup (200).
+- Total 49 tes, lint dan build dengan konfigurasi lokal lulus. Graphify AST diperbarui; parser SQL masih belum tersedia. Hasil ini merupakan verifikasi lokal, bukan konfirmasi deployment Vercel berhasil.
