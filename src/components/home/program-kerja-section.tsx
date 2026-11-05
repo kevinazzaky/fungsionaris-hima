@@ -3,23 +3,34 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { FlourishDivider } from "@/components/ui/flourish-divider";
 import { ProgramKerjaTabs } from "@/components/home/program-kerja-tabs";
 
-export function ProgramKerjaSection() {
+export function ProgramKerjaSection({
+  programs,
+}: {
+  programs: import("@/domain/programs").Program[];
+}) {
   return (
-    <section id="program-kerja" className="scroll-mt-16 bg-zinc-100 py-20 sm:py-28">
+    <section
+      id="program-kerja"
+      className="scroll-mt-16 bg-zinc-100 py-20 sm:py-28"
+    >
       <div className="mx-auto max-w-6xl px-6">
         <Reveal>
           <FlourishDivider />
         </Reveal>
 
         <Reveal delay={100} className="mt-8 text-center">
-          <SectionHeading script="Program" bold="Kerja" className="text-center" />
+          <SectionHeading
+            script="Program"
+            bold="Kerja"
+            className="text-center"
+          />
           <p className="mx-auto mt-3 max-w-md text-sm text-zinc-500">
             Daftar program kerja dalam naungan HIMA TI
           </p>
         </Reveal>
 
         <div className="mt-10">
-          <ProgramKerjaTabs />
+          <ProgramKerjaTabs programs={programs} />
         </div>
       </div>
     </section>

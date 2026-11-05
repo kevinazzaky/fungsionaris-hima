@@ -2,93 +2,29 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import {
-  Broadcast,
-  Cake,
-  Code,
-  HandHeart,
-  Microphone,
-} from "@phosphor-icons/react/dist/ssr";
 import { motion, AnimatePresence } from "motion/react";
 
-const periods = [
-  {
-    key: "2025-2026",
-    label: "2025/2026",
-    programs: [
-      {
-        icon: Microphone,
-        title: "Seminar Nasional",
-        body: "Kegiatan untuk memperluas pengetahuan dan wawasan mahasiswa mengenai perkembangan di bidang Teknologi Informasi. Seminar ini mendorong pertukaran ide dan inovasi, serta mendukung peningkatan kualitas pendidikan dengan menghadirkan narasumber yang kompeten.",
-        image: "/hero/foto-3.jpg",
-      },
-      {
-        icon: Code,
-        title: "Workshop Web Development",
-        body: "Pelatihan intensif 16 kali pertemuan untuk mempelajari dasar-dasar pemrograman website modern, mulai dari HTML, CSS, JavaScript, PHP, hingga version control Git & GitHub.",
-        image: "/proker/workshop-webdev.jpg",
-      },
-      {
-        icon: Broadcast,
-        title: "Webinar Nasional",
-        body: "Diskusi daring bersama praktisi dan akademisi seputar dunia teknologi.",
-        image: "/proker/webinar-nasional.jpg",
-      },
-      {
-        icon: HandHeart,
-        title: "Kerja Sosial",
-        body: "Bertujuan meningkatkan rasa kepedulian mahasiswa terhadap kehidupan sosial masyarakat, dengan membantu memberikan solusi aplikatif berdasarkan wawasan dan ilmu mahasiswa, sekaligus memperkuat hubungan antara mahasiswa dan masyarakat.",
-        image: null,
-      },
-      {
-        icon: Cake,
-        title: "IT Versary",
-        body: "Perayaan tahunan Program Studi Teknologi Informasi bersama seluruh civitas akademika.",
-        image: null,
-      },
-    ],
-  },
-  {
-    key: "2024-2025",
-    label: "2024/2025",
-    programs: [
-      {
-        icon: Cake,
-        title: "IT Versary & Sertijab",
-        body: "Perayaan tahunan sekaligus serah terima jabatan kepengurusan HIMA TI.",
-        image: "/proker/it-versary.jpg",
-      },
-      {
-        icon: Microphone,
-        title: "Seminar Nasional",
-        body: "Seminar dengan pembicara nasional membahas tren dan isu terkini teknologi informasi.",
-        image: "/proker/seminar-nasional.jpg",
-      },
-      {
-        icon: HandHeart,
-        title: "Kerja Sosial",
-        body: "Pengabdian masyarakat lewat edukasi dan kegiatan sosial di lingkungan sekitar kampus.",
-        image: "/proker/kersos-2025.jpg",
-      },
-      {
-        icon: Code,
-        title: "IT Bootcamp",
-        body: "Pelatihan intensif pengembangan skill teknis bagi mahasiswa Teknologi Informasi.",
-        image: "/proker/it-bootcamp.webp",
-      },
-    ],
-  },
-];
+import type { Program } from "@/domain/programs";
+import { programPeriods } from "@/components/home/program-periods";
 
-export function ProgramPeriodTabs() {
-  const [active, setActive] = useState(periods[0].key);
-  const current = periods.find((p) => p.key === active) ?? periods[0];
+export function ProgramPeriodTabs({ programs }: { programs: Program[] }) {
+  const periods = programPeriods(programs);
+  const [active, setActive] = useState(periods[0]?.key || "");
+  const current = periods.find((p) => p.key === active) ??
+    periods[0] ?? { key: "", label: "", programs: [] };
+
+  if (!periods.length)
+    return (
+      <p className="text-zinc-600">
+        Belum ada program kerja yang dipublikasikan.
+      </p>
+    );
 
   return (
     <div>
-      <div className="relative inline-flex rounded-full border border-zinc-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+      <div className="relative inline-flex max-w-full flex-wrap rounded-full border border-zinc-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
         {periods.map((period) => {
-          const isSelected = active === period.key;
+          const isSelected = current.key === period.key;
           return (
             <button
               key={period.key}
@@ -96,7 +32,9 @@ export function ProgramPeriodTabs() {
               onClick={() => setActive(period.key)}
               aria-pressed={isSelected}
               className={`relative z-10 rounded-full px-6 py-2 text-sm font-semibold transition-colors duration-200 ${
-                isSelected ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-900"
+                isSelected
+                  ? "text-zinc-950"
+                  : "text-zinc-500 hover:text-zinc-900"
               }`}
             >
               {isSelected && (
@@ -114,7 +52,7 @@ export function ProgramPeriodTabs() {
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={active}
+          key={current.key}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
@@ -123,10 +61,14 @@ export function ProgramPeriodTabs() {
         >
           {current.programs.map((program, idx) => (
             <motion.div
-              key={program.title}
+              key={program.id}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              transition={{
+                duration: 0.4,
+                delay: idx * 0.08,
+                ease: [0.16, 1, 0.3, 1],
+              }}
               className="group overflow-hidden rounded-3xl border border-zinc-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/60 hover:shadow-xl hover:shadow-zinc-200/60"
             >
               {program.image && (
@@ -148,8 +90,8 @@ export function ProgramPeriodTabs() {
                 <h3 className="mt-4 font-heading text-xl font-bold text-zinc-900">
                   {program.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                  {program.body}
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-600">
+                  {program.fullDescription || program.body}
                 </p>
               </div>
             </motion.div>

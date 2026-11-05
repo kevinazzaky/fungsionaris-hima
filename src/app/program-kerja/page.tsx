@@ -1,7 +1,10 @@
 import { DetailHeader } from "@/components/detail/detail-header";
 import { ProgramPeriodTabs } from "@/components/detail/program-period-tabs";
 
-export default function ProgramKerjaPage() {
+import { loadPrograms } from "@/data/programs";
+
+export default async function ProgramKerjaPage() {
+  const programs = await loadPrograms();
   return (
     <>
       <DetailHeader
@@ -10,7 +13,7 @@ export default function ProgramKerjaPage() {
       />
 
       <section className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-        <ProgramPeriodTabs />
+        <ProgramPeriodTabs programs={programs} />
       </section>
     </>
   );

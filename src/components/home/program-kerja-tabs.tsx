@@ -3,11 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
-  Broadcast,
-  Cake,
-  Code,
-  HandHeart,
-  Microphone,
   ArrowRight,
   Info,
   CaretLeft,
@@ -19,171 +14,12 @@ import {
   type ProgramItem,
 } from "@/components/home/program-modal";
 
-interface PeriodData {
-  key: string;
-  label: string;
-  programs: ProgramItem[];
-}
+import type { Program } from "@/domain/programs";
+import { programPeriods } from "./program-periods";
 
-const periods: PeriodData[] = [
-  {
-    key: "2025-2026",
-    label: "2025/2026",
-    programs: [
-      {
-        icon: Microphone,
-        title: "Seminar Nasional",
-        body: "Pembicara nasional membahas tren teknologi informasi terkini.",
-        fullDescription:
-          "Kegiatan untuk memperluas pengetahuan dan wawasan mahasiswa mengenai perkembangan di bidang Teknologi Informasi. Seminar ini mendorong pertukaran ide dan inovasi, serta mendukung peningkatan kualitas pendidikan dengan menghadirkan narasumber yang kompeten.",
-        image: "/hero/foto-3.jpg",
-        executionDate: "12 Maret 2026",
-        time: "Selesai Dilaksanakan",
-        location: "Auditorium Kampus Undiknas",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-      },
-      {
-        icon: Code,
-        title: "Workshop Web Development",
-        body: "Pelatihan intensif 16x pertemuan fundamental website: HTML, CSS, JS, PHP, & Git.",
-        fullDescription:
-          "Workshop intensif yang diselenggarakan oleh HIMA TI Undiknas untuk mempelajari dasar-dasar pengembangan website dari awal. Mencakup pengenalan konsep web, pembuatan struktur HTML, styling modern CSS, interaktivitas JavaScript, backend dasar PHP, hingga kolaborasi dan version control menggunakan Git & GitHub.",
-        image: "/proker/workshop-webdev.jpg",
-        date: "17 April - 22 July 2026",
-        executionDate: "17 April - 22 July 2026",
-        time: "Selesai Dilaksanakan",
-        location: "Laboratorium Govinda RnD Undiknas",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-        extraDetails: {
-          price: "Gratis (FREE)",
-          benefits: ["Knowledge", "Modul Pembelajaran", "Pacar Bisa Ngoding"],
-          contactPerson: "Santika (085171702787) / Dedy (081337771929)",
-        },
-      },
-      {
-        icon: Broadcast,
-        title: "Webinar Nasional",
-        body: "The Autonomous Era: Bagaimana Integrasi AIoT Menjadikan Perangkat Berpikir dan Bertindak Otomatis.",
-        fullDescription:
-          "Webinar Nasional bertajuk 'THE AUTONOMOUS ERA: Bagaimana Integrasi AIoT Menjadikan Perangkat Berpikir dan Bertindak secara Otomatis'. Menghadirkan pembicara ahli untuk mengupas tuntas penerapan nyata kecerdasan buatan dan IoT di industri modern.",
-        image: "/proker/webinar-nasional.jpg",
-        date: "03 Oktober 2026",
-        executionDate: "03 Oktober 2026",
-        time: "09:30 WITA",
-        location: "Daring via Zoom Meeting",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-        gformLink:
-          "https://docs.google.com/forms/d/e/1FAIpQLSe07p0vZgjx1W1NzMpBUGsXfh6TuUE9s6SCmb8aLVM-F8QZnw/viewform",
-        extraDetails: {
-          speakers: [
-            "I Putu Arich Arthawan S.Kom, M.T. (Narasumber 1)",
-            "Ni Luh Putu Ika Candrawengi S.Stat., M.Stat. (Narasumber 2)",
-            "Ewaldo Zenobia S.Tr.T. (Narasumber 3)",
-            "Ir. I Gusti Ngurah Darma Paramartha S.T., M.T., I.P.M. (Moderator)",
-          ],
-          price: "Rp 25.000 (Early Bird)",
-          benefits: [
-            "E-Certificate",
-            "Pengalaman & Relasi",
-            "Wawasan Praktis AIoT",
-            "Poin SKP A",
-          ],
-          contactPerson: "Dhea (0818-0522-8056) / Indah (0822-1344-4798)",
-        },
-      },
-      {
-        icon: HandHeart,
-        title: "Kerja Sosial",
-        body: "Pengabdian masyarakat di lingkungan sekitar kampus.",
-        fullDescription:
-          "Bertujuan meningkatkan rasa kepedulian mahasiswa terhadap kehidupan sosial masyarakat, dengan membantu memberikan solusi aplikatif berdasarkan wawasan dan ilmu mahasiswa, sekaligus memperkuat hubungan antara mahasiswa dan masyarakat.",
-        image: null,
-        executionDate: "Semester Genap 2025/2026",
-        time: "Menyesuaikan Jadwal",
-        location: "Denpasar dan Sekitarnya",
-        status: "upcoming",
-        statusText: "Segera Hadir",
-      },
-      {
-        icon: Cake,
-        title: "IT Versary",
-        body: "Perayaan tahunan Program Studi Teknologi Informasi.",
-        fullDescription:
-          "Peringatan hari jadi Program Studi Teknologi Informasi yang dirayakan melalui rangkaian kompetisi inovasi mahasiswa, pameran karya teknologi, pentas ekspresi seni, dan keakraban seluruh civitas akademika.",
-        image: null,
-        executionDate: "Semester Genap 2025/2026",
-        time: "Menyesuaikan Jadwal",
-        location: "Kampus Undiknas Denpasar",
-        status: "upcoming",
-        statusText: "Segera Hadir",
-      },
-    ],
-  },
-  {
-    key: "2024-2025",
-    label: "2024/2025",
-    programs: [
-      {
-        icon: Cake,
-        title: "IT Versary & Sertijab",
-        body: "Perayaan tahunan sekaligus serah terima jabatan kepengurusan.",
-        fullDescription:
-          "Malam perayaan hari jadi Program Studi TI sekaligus serah terima jabatan (sertijab) kepengurusan HIMA TI periode 2024/2025 kepada penerus tongkat estafet berikutnya.",
-        image: "/proker/it-versary.jpg",
-        executionDate: "22 Februari 2025",
-        time: "Selesai Dilaksanakan",
-        location: "Jyooty Villa, Nusa Dua",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-      },
-      {
-        icon: Microphone,
-        title: "Seminar Nasional",
-        body: "Pembicara nasional membahas tren teknologi informasi.",
-        fullDescription:
-          "Seminar nasional inspiratif yang mempertemukan mahasiswa dengan pembicara berpengalaman nasional dalam memahami dinamika dan ekosistem industri teknologi modern.",
-        image: "/proker/seminar-nasional.jpg",
-        executionDate: "15 Mei 2025",
-        time: "Selesai Dilaksanakan",
-        location: "Auditorium Undiknas",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-      },
-      {
-        icon: HandHeart,
-        title: "Kerja Sosial",
-        body: "Pengabdian masyarakat di lingkungan sekitar kampus.",
-        fullDescription:
-          "Aksi sosial mahasiswa TI yang berfokus pada pendampingan masyarakat dan kepedulian lingkungan sekitar guna mempererat relasi mahasiswa dengan warga lokal.",
-        image: "/proker/kersos-2025.jpg",
-        executionDate: "14 - 15 Agustus 2025",
-        time: "Selesai Dilaksanakan",
-        location: "SMAN 2 Denpasar",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-      },
-      {
-        icon: Code,
-        title: "IT Bootcamp",
-        body: "Pelatihan intensif pengembangan skill teknis mahasiswa.",
-        fullDescription:
-          "Pelatihan intensif hands-on pemrograman dan pemecahan masalah algoritma untuk meningkatkan kompetensi teknis mahasiswa TI menghadapi kebutuhan industri digital.",
-        image: "/proker/it-bootcamp.webp",
-        executionDate: "07 - 09 November 2025",
-        time: "Selesai Dilaksanakan",
-        location: "Agro Puncak Lestari, Bedugul",
-        status: "closed",
-        statusText: "Pendaftaran Ditutup",
-      },
-    ],
-  },
-];
-
-export function ProgramKerjaTabs() {
-  const [active, setActive] = useState(periods[0].key);
+export function ProgramKerjaTabs({ programs }: { programs: Program[] }) {
+  const periods = programPeriods(programs);
+  const [active, setActive] = useState(periods[0]?.key || "");
   const [selectedProgram, setSelectedProgram] = useState<ProgramItem | null>(
     null,
   );
@@ -192,7 +28,9 @@ export function ProgramKerjaTabs() {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const current = periods.find((p) => p.key === active) ?? periods[0];
+  const current = periods.find((p) => p.key === active) ??
+    periods[0] ?? { key: "", label: "", programs: [] };
+  const programCount = current.programs.length;
 
   const checkScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -205,11 +43,11 @@ export function ProgramKerjaTabs() {
     const card = el.querySelector<HTMLElement>("[data-proker-card]");
     if (card) {
       const cardWidth = card.offsetWidth + 20;
-      const maxIndex = current.programs.length - 1;
+      const maxIndex = programCount - 1;
       const index = atEnd ? maxIndex : Math.round(scrollLeft / cardWidth);
       setActiveIndex(Math.max(0, Math.min(index, maxIndex)));
     }
-  }, [current.programs.length]);
+  }, [programCount]);
 
   const handleTabChange = (key: string) => {
     setActive(key);
@@ -257,13 +95,20 @@ export function ProgramKerjaTabs() {
     }
   };
 
+  if (!periods.length)
+    return (
+      <p className="text-center text-zinc-600">
+        Belum ada program kerja yang dipublikasikan.
+      </p>
+    );
+
   return (
     <div>
       {/* Sliding Pill Tab Switcher */}
       <div className="flex justify-center">
-        <div className="relative inline-flex rounded-full border border-zinc-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+        <div className="relative inline-flex max-w-full flex-wrap justify-center rounded-full border border-zinc-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
           {periods.map((period) => {
-            const isSelected = active === period.key;
+            const isSelected = current.key === period.key;
             return (
               <button
                 key={period.key}
@@ -310,7 +155,7 @@ export function ProgramKerjaTabs() {
         {/* Animated Carousel List */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={active}
+            key={current.key}
             ref={scrollContainerRef}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -334,7 +179,7 @@ export function ProgramKerjaTabs() {
             {current.programs.map((program, i) =>
               program.image ? (
                 <motion.button
-                  key={program.title}
+                  key={program.id}
                   type="button"
                   data-proker-card
                   onClick={() => setSelectedProgram(program)}
@@ -399,7 +244,7 @@ export function ProgramKerjaTabs() {
                 </motion.button>
               ) : (
                 <motion.button
-                  key={program.title}
+                  key={program.id}
                   type="button"
                   data-proker-card
                   onClick={() => setSelectedProgram(program)}
@@ -494,7 +339,7 @@ export function ProgramKerjaTabs() {
           const isActive = idx === activeIndex;
           return (
             <button
-              key={program.title}
+              key={program.id}
               type="button"
               onClick={() => scrollToIndex(idx)}
               aria-label={`Lihat program ${idx + 1}: ${program.title}`}
