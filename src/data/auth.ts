@@ -1,10 +1,12 @@
 import "server-only";
 import { cache } from "react";
+import { connection } from "next/server";
 import { createAuthClient } from "@/data/supabase/server";
 import { getPrisma } from "@/data/prisma";
 import { isBackendConfigured } from "@/lib/backend-config";
 
 export const getAdmin = cache(async () => {
+  await connection();
   if (!isBackendConfigured()) return null;
   const client = await createAuthClient();
   const {
