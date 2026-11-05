@@ -8,36 +8,14 @@ import { DivisiList } from "@/components/home/divisi-list";
 import { DragScroll } from "@/components/ui/drag-scroll";
 import { ProfileAvatar } from "@/components/ui/profile-avatar";
 import { BalineseCorner, BalineseDivider, BalineseWatermark } from "@/components/ui/balinese-ornaments";
-import {
-  BENDAHARA,
-  DELEGASI,
-  DIVISI_LIST,
-  KETUA_UMUM,
-  PEMBINA,
-  SEKRETARIAT,
-  WAKIL_KETUA,
-} from "@/lib/fungsionaris-data";
+import { useOrganization } from "@/components/public-content-provider";
+import type { Person } from "@/lib/fungsionaris-data";
 
-const pengurus = [
-  KETUA_UMUM,
-  WAKIL_KETUA,
-  ...SEKRETARIAT,
-  ...BENDAHARA,
-];
-
-const pimpinanLengkap = [
-  PEMBINA,
-  KETUA_UMUM,
-  WAKIL_KETUA,
-  ...SEKRETARIAT,
-  ...BENDAHARA,
-];
-
-function PersonCard({ name, role }: { name: string; role: string }) {
+function PersonCard({ name, role, photo }: Person) {
   return (
     <div className="group overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-100/90 transition-all duration-300 hover:-translate-y-1 hover:border-amber-400/60 hover:shadow-md">
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-900">
-        <ProfileAvatar />
+        <ProfileAvatar photo={photo} name={name} />
       </div>
       <div className="p-3 text-left sm:p-4">
         <p className="font-heading text-sm font-semibold leading-snug text-zinc-900 transition-colors group-hover:text-amber-600">
@@ -51,6 +29,9 @@ function PersonCard({ name, role }: { name: string; role: string }) {
 
 export function FungsionarisSection() {
   const [showAll, setShowAll] = useState(false);
+  const { PIMPINAN, PEMBINA_LIST, SEKRETARIAT, BENDAHARA, DELEGASI, DIVISI_LIST } = useOrganization();
+  const pengurus = [...PIMPINAN, ...SEKRETARIAT, ...BENDAHARA];
+  const pimpinanLengkap = [...PEMBINA_LIST, ...pengurus];
 
   return (
     <section id="fungsionaris" className="relative overflow-hidden scroll-mt-16 bg-zinc-100 py-20 sm:py-28">
@@ -74,7 +55,7 @@ export function FungsionarisSection() {
               className="group relative aspect-[3/4] w-56 shrink-0 snap-start overflow-hidden rounded-2xl border border-zinc-900/10 shadow-md transition-all duration-300 hover:-translate-y-1.5 hover:border-amber-400/60 hover:shadow-xl hover:shadow-amber-500/15"
             >
               <div className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-105">
-                <ProfileAvatar />
+                <ProfileAvatar photo={person.photo} name={person.name} />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent transition-opacity duration-300" />
               <div className="absolute inset-x-0 bottom-0 p-4 text-left">
@@ -111,7 +92,7 @@ export function FungsionarisSection() {
                   </h3>
                   <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                     {pimpinanLengkap.map((person) => (
-                      <PersonCard key={person.name} name={person.name} role={person.role} />
+                      <PersonCard key={person.id} {...person} />
                     ))}
                   </div>
                 </div>
@@ -123,7 +104,7 @@ export function FungsionarisSection() {
                   </h3>
                   <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                     {DELEGASI.map((person) => (
-                      <PersonCard key={person.name} name={person.name} role={person.role} />
+                      <PersonCard key={person.id} {...person} />
                     ))}
                   </div>
                 </div>
@@ -135,12 +116,9 @@ export function FungsionarisSection() {
                       {divisi.fullName}
                     </h3>
                     <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                      <PersonCard
-                        name={divisi.koordinator.name}
-                        role={divisi.koordinator.role}
-                      />
+                      {divisi.koordinator && <PersonCard {...divisi.koordinator} />}
                       {divisi.anggota.map((person) => (
-                        <PersonCard key={person.name} name={person.name} role={person.role} />
+                        <PersonCard key={person.id} {...person} />
                       ))}
                     </div>
                   </div>

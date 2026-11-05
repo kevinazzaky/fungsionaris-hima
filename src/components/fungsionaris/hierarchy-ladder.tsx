@@ -2,16 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  BENDAHARA,
-  DELEGASI,
-  DIVISI_LIST,
-  KETUA_UMUM,
-  PEMBINA,
-  SEKRETARIAT,
-  WAKIL_KETUA,
-  type DivisiData,
-} from "@/lib/fungsionaris-data";
+import { useOrganization, usePublicContent, type PublicDivision } from "@/components/public-content-provider";
 import { MemberNode } from "./member-node";
 import { BalineseCorner, BalineseDivider } from "@/components/ui/balinese-ornaments";
 
@@ -28,6 +19,10 @@ const tabs: { key: TabKey; label: string }[] = [
 
 export function HierarchyLadder() {
   const [activeTab, setActiveTab] = useState<TabKey>("inti");
+  const { DIVISI_LIST } = useOrganization();
+  const { members } = usePublicContent();
+
+  if (members.length === 0) return <p className="py-12 text-center text-zinc-600">Susunan fungsionaris belum dipublikasikan.</p>;
 
   return (
     <div className="w-full">
@@ -143,6 +138,7 @@ export function HierarchyLadder() {
  * 4. Sekretaris & Bendahara
  */
 function IntiLadder() {
+  const { PEMBINA_LIST, PIMPINAN, SEKRETARIAT, BENDAHARA } = useOrganization();
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center">
       {/* ── Pucuk: Pembina Organisasi (Solo Terhormat) ─────────────── */}
@@ -151,7 +147,7 @@ function IntiLadder() {
           Pembina HIMA TI
         </span>
 
-        <MemberNode person={PEMBINA} size="lg" />
+        {PEMBINA_LIST.map((person) => <MemberNode key={person.id} person={person} size="lg" />)}
       </div>
 
       {/* ── Konektor Vertikal dari Pembina ke Pimpinan Himpunan ─────── */}
@@ -167,9 +163,8 @@ function IntiLadder() {
         </span>
 
         {/* Kevin (Ketua Umum) & Wahyu (Wakil Ketua) Berdampingan Sejajar */}
-        <div className="relative flex w-full max-w-2xl justify-center gap-10 sm:gap-20 px-4">
-          <MemberNode person={KETUA_UMUM} size="lg" highlight />
-          <MemberNode person={WAKIL_KETUA} size="lg" highlight />
+        <div className="relative flex w-full max-w-2xl flex-wrap justify-center gap-4 px-2 sm:gap-12">
+          {PIMPINAN.map((person) => <MemberNode key={person.id} person={person} size="lg" highlight />)}
         </div>
       </div>
 
@@ -231,6 +226,7 @@ function IntiLadder() {
  * Tangga Perwakilan & Delegasi Resmi (section tersendiri, terpisah dari Pimpinan Inti)
  */
 function DelegasiLadder() {
+  const { DELEGASI } = useOrganization();
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center">
       <div className="text-center">
@@ -266,7 +262,7 @@ function DelegasiLadder() {
  * Garis Konektor Tangga
  * Bawah: Seluruh Anggota Divisi
  */
-function SingleDivisiLadder({ divisi }: { divisi: DivisiData }) {
+function SingleDivisiLadder({ divisi }: { divisi: PublicDivision }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center">
       {/* Header Divisi */}
@@ -288,7 +284,7 @@ function SingleDivisiLadder({ divisi }: { divisi: DivisiData }) {
         <span className="mb-4 rounded-full border border-amber-400/40 bg-amber-50 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700">
           Koordinator Divisi
         </span>
-        <MemberNode person={divisi.koordinator} size="lg" highlight />
+        {divisi.koordinator && <MemberNode person={divisi.koordinator} size="lg" highlight />}
       </div>
 
       {/* Konektor Vertikal Menuju Anggota */}

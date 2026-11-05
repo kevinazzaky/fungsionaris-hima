@@ -8,9 +8,10 @@ export const metadata: Metadata = {
     "Dokumentasi momen dari berbagai program kerja dan kegiatan HIMA TI.",
 };
 
-import { GALLERY_PHOTOS } from "@/lib/gallery-data";
+import { loadPublicContent } from "@/data/public-content";
 
-export default function GalleryPage() {
+export default async function GalleryPage() {
+  const { gallery } = await loadPublicContent();
   return (
     <>
       <DetailHeader
@@ -19,7 +20,7 @@ export default function GalleryPage() {
       />
 
       <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <GalleryGrid photos={GALLERY_PHOTOS} initialCount={12} step={12} />
+        <GalleryGrid photos={gallery} initialCount={12} step={12} />
       </section>
     </>
   );

@@ -1,4 +1,7 @@
-export function ProfileAvatar() {
+import Image from "next/image";
+
+export function ProfileAvatar({ photo, name = "Foto fungsionaris" }: { photo?: string; name?: string }) {
+  if (photo) return <Image src={photo} alt={name} fill sizes="(min-width: 768px) 240px, 160px" className="object-cover" />;
   return (
     <div className="absolute inset-0 flex items-end justify-center overflow-hidden bg-zinc-700">
       <svg
