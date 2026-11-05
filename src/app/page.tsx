@@ -5,17 +5,31 @@ import { FungsionarisSection } from "@/components/home/fungsionaris-section";
 import { PendaftaranSection } from "@/components/home/pendaftaran-section";
 import { GallerySection } from "@/components/home/gallery-section";
 import { SectionScroller } from "@/components/home/section-scroller";
+import { loadPublicContent } from "@/data/public-content";
+import { PublicContentProvider } from "@/components/public-content-provider";
 
-export default function Home() {
+import { loadPrograms } from "@/data/programs";
+
+import { loadRegistrationSettings } from "@/data/registration-settings";
+
+export default async function Home() {
+  const [content, programs, registration] = await Promise.all([
+    loadPublicContent(),
+    loadPrograms(),
+    loadRegistrationSettings(),
+  ]);
   return (
-    <>
+    <PublicContentProvider {...content}>
       <SectionScroller />
-      <Hero />
+      <Hero images={content.hero} />
       <AboutSection />
       <FungsionarisSection />
-      <ProgramKerjaSection />
+      <ProgramKerjaSection programs={programs} />
       <GallerySection />
-      <PendaftaranSection />
-    </>
+      <PendaftaranSection
+        isOpen={registration.isOpen}
+        period={process.env.REGISTRATION_PERIOD || "2026"}
+      />
+    </PublicContentProvider>
   );
 }

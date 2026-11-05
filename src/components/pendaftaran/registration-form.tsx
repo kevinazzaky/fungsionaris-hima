@@ -27,14 +27,15 @@ const LINE_GROUP = LINE_GROUP_URL;
 
 type Status = "idle" | "loading" | "success" | "error";
 
-export function RegistrationForm() {
+export function RegistrationForm({ period }: { period: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileDragOver, setFileDragOver] = useState(false);
   const [selectedDivisi, setSelectedDivisi] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [submittedData, setSubmittedData] = useState<RegistrationDocumentData | null>(null);
+  const [submittedData, setSubmittedData] =
+    useState<RegistrationDocumentData | null>(null);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
 
@@ -42,7 +43,7 @@ export function RegistrationForm() {
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const MAX_MB = 10;
+  const MAX_MB = 3;
   const MAX_BYTES = MAX_MB * 1024 * 1024;
   const MAX_FOTO_MB = 5;
 
@@ -116,7 +117,8 @@ export function RegistrationForm() {
     // Ambil data untuk cetak dokumen
     const nama = (data.get("nama") as string)?.trim() || "";
     const nim = (data.get("nim") as string)?.trim() || "";
-    const tempatTanggalLahir = (data.get("tempatTanggalLahir") as string)?.trim() || "";
+    const tempatTanggalLahir =
+      (data.get("tempatTanggalLahir") as string)?.trim() || "";
     const jenisKelamin = (data.get("jenisKelamin") as string) || "";
     const alamat = (data.get("alamat") as string)?.trim() || "";
     const noHp = (data.get("noHp") as string)?.trim() || "";
@@ -125,7 +127,8 @@ export function RegistrationForm() {
     const pengalaman2 = (data.get("pengalaman2") as string)?.trim() || "-";
     const pengalaman3 = (data.get("pengalaman3") as string)?.trim() || "-";
     const minatSkill = (data.get("minatSkill") as string)?.trim() || "";
-    const alasanBergabung = (data.get("alasanBergabung") as string)?.trim() || "";
+    const alasanBergabung =
+      (data.get("alasanBergabung") as string)?.trim() || "";
     const alasanDivisi = (data.get("alasanDivisi") as string)?.trim() || "";
 
     const divisiLabels = selectedDivisi
@@ -133,17 +136,23 @@ export function RegistrationForm() {
       .join(", ");
 
     // Format gabungan pengalaman untuk API
-    const pengalamanCombined = [pengalaman1, pengalaman2, pengalaman3]
-      .filter((p) => p && p !== "-")
-      .join("; ") || "-";
+    const pengalamanCombined =
+      [pengalaman1, pengalaman2, pengalaman3]
+        .filter((p) => p && p !== "-")
+        .join("; ") || "-";
     data.set("pengalamanOrganisasi", pengalamanCombined);
 
     try {
-      const res = await fetch("/api/pendaftaran", { method: "POST", body: data });
+      const res = await fetch("/api/pendaftaran", {
+        method: "POST",
+        body: data,
+      });
       const json = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(json.error ?? "Terjadi kesalahan saat memproses pendaftaran.");
+        setErrorMsg(
+          json.error ?? "Terjadi kesalahan saat memproses pendaftaran.",
+        );
         setStatus("error");
       } else {
         const docData: RegistrationDocumentData = {
@@ -162,6 +171,7 @@ export function RegistrationForm() {
           divisi: divisiLabels,
           alasanDivisi,
           fotoUrl: fotoPreviewUrl || undefined,
+          period,
           tanggalDaftar: new Date().toLocaleDateString("id-ID", {
             day: "numeric",
             month: "long",
@@ -178,7 +188,9 @@ export function RegistrationForm() {
         setSelectedDivisi([]);
       }
     } catch {
-      setErrorMsg("Gagal terhubung ke server. Silakan coba beberapa saat lagi.");
+      setErrorMsg(
+        "Gagal terhubung ke server. Silakan coba beberapa saat lagi.",
+      );
       setStatus("error");
     }
   }
@@ -200,9 +212,18 @@ export function RegistrationForm() {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }}
+              transition={{
+                type: "spring",
+                stiffness: 400,
+                damping: 20,
+                delay: 0.1,
+              }}
             >
-              <CheckCircle size={44} weight="fill" className="text-emerald-500" />
+              <CheckCircle
+                size={44}
+                weight="fill"
+                className="text-emerald-500"
+              />
             </motion.div>
           </div>
 
@@ -214,8 +235,9 @@ export function RegistrationForm() {
               Pendaftaran Berhasil Dikirim!
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">
-              Data pendaftaran kamu sudah resmi tersimpan di sistem. Silakan cetak atau unduh berkas
-              formulir pendaftaran di bawah ini untuk dibawa saat wawancara.
+              Data pendaftaran kamu sudah resmi tersimpan di sistem. Silakan
+              cetak atau unduh berkas formulir pendaftaran di bawah ini untuk
+              dibawa saat wawancara.
             </p>
           </div>
 
@@ -232,7 +254,9 @@ export function RegistrationForm() {
               </div>
               <div className="col-span-2">
                 <span className="text-zinc-500">Divisi yang Diminati:</span>
-                <p className="font-bold text-zinc-900">{submittedData.divisi}</p>
+                <p className="font-bold text-zinc-900">
+                  {submittedData.divisi}
+                </p>
               </div>
             </div>
           </div>
@@ -281,10 +305,18 @@ export function RegistrationForm() {
               />
             </svg>
             <div className="text-left">
-              <p className="text-sm font-bold text-zinc-900">Gabung Grup LINE Calon Fungsionaris</p>
-              <p className="text-xs text-zinc-500">Klik untuk masuk ke grup koordinasi seleksi resmi</p>
+              <p className="text-sm font-bold text-zinc-900">
+                Gabung Grup LINE Calon Fungsionaris
+              </p>
+              <p className="text-xs text-zinc-500">
+                Klik untuk masuk ke grup koordinasi seleksi resmi
+              </p>
             </div>
-            <ArrowRight size={16} weight="bold" className="ml-auto text-zinc-400 group-hover:translate-x-1" />
+            <ArrowRight
+              size={16}
+              weight="bold"
+              className="ml-auto text-zinc-400 group-hover:translate-x-1"
+            />
           </a>
 
           <button
@@ -313,9 +345,12 @@ export function RegistrationForm() {
             >
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h4 className="text-base font-bold text-zinc-900">Pratinjau Dokumen Cetak (2 Halaman A4)</h4>
+                  <h4 className="text-base font-bold text-zinc-900">
+                    Pratinjau Dokumen Cetak (2 Halaman A4)
+                  </h4>
                   <p className="text-xs text-zinc-500">
-                    Dokumen ini akan tercetak otomatis saat menekan tombol cetak.
+                    Dokumen ini akan tercetak otomatis saat menekan tombol
+                    cetak.
                   </p>
                 </div>
                 <button
@@ -338,12 +373,14 @@ export function RegistrationForm() {
         </AnimatePresence>
 
         {/* Print document portaled to body (outside <main> which is hidden during print) */}
-        {typeof document !== "undefined" && submittedData && createPortal(
-          <div className="hidden print:block">
-            <RegistrationPrintDocument data={submittedData} />
-          </div>,
-          document.body,
-        )}
+        {typeof document !== "undefined" &&
+          submittedData &&
+          createPortal(
+            <div className="hidden print:block">
+              <RegistrationPrintDocument data={submittedData} />
+            </div>,
+            document.body,
+          )}
       </div>
     );
   }
@@ -352,11 +389,19 @@ export function RegistrationForm() {
   // FORMULIR PENDAFTARAN LENGKAP
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-8 no-print">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-8 no-print"
+    >
       {/* ── SEKSI 1: Data Diri & Kontak ── */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
-          <IdentificationCard size={20} weight="bold" className="text-amber-500" />
+          <IdentificationCard
+            size={20}
+            weight="bold"
+            className="text-amber-500"
+          />
           <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-zinc-900">
             1. Data Diri &amp; Kontak Pribadi
           </h3>
@@ -404,7 +449,9 @@ export function RegistrationForm() {
               </span>
             </div>
             <p className="text-xs text-zinc-500 leading-relaxed">
-              Unggah pas foto formal (format JPG, PNG, atau WEBP, maks. 5 MB). Foto akan langsung terpasang otomatis pada lembar formulir pendaftaran saat dicetak.
+              Unggah pas foto formal (format JPG, PNG, atau WEBP, maks. 5 MB).
+              Foto akan langsung terpasang otomatis pada lembar formulir
+              pendaftaran saat dicetak.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <input
@@ -434,7 +481,10 @@ export function RegistrationForm() {
         {/* Nama + NIM */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="nama">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="nama"
+            >
               Nama Lengkap <span className="text-amber-500">*</span>
             </label>
             <input
@@ -448,7 +498,10 @@ export function RegistrationForm() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="nim">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="nim"
+            >
               NIM <span className="text-amber-500">*</span>
             </label>
             <input
@@ -465,7 +518,10 @@ export function RegistrationForm() {
         {/* Angkatan, Tempat Tgl Lahir, Jenis Kelamin */}
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="angkatan">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="angkatan"
+            >
               Angkatan <span className="text-amber-500">*</span>
             </label>
             <select
@@ -475,15 +531,22 @@ export function RegistrationForm() {
               defaultValue=""
               className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-400/20"
             >
-              <option value="" disabled>Pilih angkatan</option>
+              <option value="" disabled>
+                Pilih angkatan
+              </option>
               {angkatanOptions.map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>
+                  {y}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="tempatTanggalLahir">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="tempatTanggalLahir"
+            >
               Tempat, Tanggal Lahir <span className="text-amber-500">*</span>
             </label>
             <input
@@ -497,7 +560,10 @@ export function RegistrationForm() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="jenisKelamin">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="jenisKelamin"
+            >
               Jenis Kelamin <span className="text-amber-500">*</span>
             </label>
             <select
@@ -507,7 +573,9 @@ export function RegistrationForm() {
               defaultValue=""
               className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-400/20"
             >
-              <option value="" disabled>Pilih jenis kelamin</option>
+              <option value="" disabled>
+                Pilih jenis kelamin
+              </option>
               <option value="Laki-laki">Laki-laki (L)</option>
               <option value="Perempuan">Perempuan (P)</option>
             </select>
@@ -516,7 +584,10 @@ export function RegistrationForm() {
 
         {/* Alamat Lengkap */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="alamat">
+          <label
+            className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+            htmlFor="alamat"
+          >
             Alamat Tinggal Lengkap <span className="text-amber-500">*</span>
           </label>
           <input
@@ -532,7 +603,10 @@ export function RegistrationForm() {
         {/* No HP & ID Line */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="noHp">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="noHp"
+            >
               No. WhatsApp / HP <span className="text-amber-500">*</span>
             </label>
             <input
@@ -546,7 +620,10 @@ export function RegistrationForm() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="idLine">
+            <label
+              className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+              htmlFor="idLine"
+            >
               ID Line <span className="text-amber-500">*</span>
             </label>
             <input
@@ -602,7 +679,10 @@ export function RegistrationForm() {
 
         {/* Minat dan Skill */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="minatSkill">
+          <label
+            className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+            htmlFor="minatSkill"
+          >
             Minat dan Skill <span className="text-amber-500">*</span>
           </label>
           <textarea
@@ -629,8 +709,12 @@ export function RegistrationForm() {
 
         {/* Alasan Bergabung HIMA TI */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="alasanBergabung">
-            Alasan Bergabung dengan HIMA TI Undiknas <span className="text-amber-500">*</span>
+          <label
+            className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+            htmlFor="alasanBergabung"
+          >
+            Alasan Bergabung dengan HIMA TI Undiknas{" "}
+            <span className="text-amber-500">*</span>
           </label>
           <textarea
             id="alasanBergabung"
@@ -675,16 +759,30 @@ export function RegistrationForm() {
                     }`}
                   >
                     {checked && (
-                      <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="#1c1c1c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg
+                        viewBox="0 0 12 12"
+                        className="h-2.5 w-2.5"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 6l3 3 5-5"
+                          stroke="#1c1c1c"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     )}
                   </span>
                   <span>
-                    <span className={`block text-sm font-semibold ${checked ? "text-zinc-950" : "text-zinc-700"}`}>
+                    <span
+                      className={`block text-sm font-semibold ${checked ? "text-zinc-950" : "text-zinc-700"}`}
+                    >
                       {d.label}
                     </span>
-                    <span className="block text-xs text-zinc-500 mt-0.5">{d.desc}</span>
+                    <span className="block text-xs text-zinc-500 mt-0.5">
+                      {d.desc}
+                    </span>
                   </span>
                 </button>
               );
@@ -694,8 +792,12 @@ export function RegistrationForm() {
 
         {/* Alasan Memilih Divisi */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-600" htmlFor="alasanDivisi">
-            Alasan Memilih Divisi Tersebut <span className="text-amber-500">*</span>
+          <label
+            className="text-xs font-bold uppercase tracking-wider text-zinc-600"
+            htmlFor="alasanDivisi"
+          >
+            Alasan Memilih Divisi Tersebut{" "}
+            <span className="text-amber-500">*</span>
           </label>
           <textarea
             id="alasanDivisi"
@@ -713,12 +815,15 @@ export function RegistrationForm() {
         <label className="text-xs font-bold uppercase tracking-wider text-zinc-600">
           Berkas Lampiran Tambahan
           <span className="ml-2 font-normal normal-case text-zinc-400">
-            (Opsional, format PDF maks. 10 MB)
+            (Opsional, format PDF maks. 3 MB)
           </span>
         </label>
 
         <div
-          onDragOver={(e) => { e.preventDefault(); setFileDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setFileDragOver(true);
+          }}
           onDragLeave={() => setFileDragOver(false)}
           onDrop={(e) => {
             e.preventDefault();
@@ -749,8 +854,12 @@ export function RegistrationForm() {
                 <UploadSimple size={22} weight="bold" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-900">{file.name}</p>
-                <p className="text-xs text-zinc-500 font-mono mt-0.5">{(file.size / 1024).toFixed(1)} KB</p>
+                <p className="text-sm font-semibold text-zinc-900">
+                  {file.name}
+                </p>
+                <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                  {(file.size / 1024).toFixed(1)} KB
+                </p>
               </div>
               <button
                 type="button"
@@ -771,9 +880,14 @@ export function RegistrationForm() {
               </div>
               <div>
                 <p className="text-sm text-zinc-600">
-                  <span className="font-semibold text-zinc-900">Klik untuk memilih</span> atau drag &amp; drop file PDF
+                  <span className="font-semibold text-zinc-900">
+                    Klik untuk memilih
+                  </span>{" "}
+                  atau drag &amp; drop file PDF
                 </p>
-                <p className="text-xs text-zinc-400 mt-1">Ukuran berkas maksimal 10 MB</p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Ukuran berkas maksimal 3 MB
+                </p>
               </div>
             </>
           )}
@@ -802,13 +916,18 @@ export function RegistrationForm() {
         ) : (
           <>
             <span>Kirim Pendaftaran &amp; Buat Berkas</span>
-            <ArrowRight size={16} weight="bold" className="transition-transform group-hover:translate-x-1" />
+            <ArrowRight
+              size={16}
+              weight="bold"
+              className="transition-transform group-hover:translate-x-1"
+            />
           </>
         )}
       </button>
 
       <p className="text-center text-xs text-zinc-500">
-        Setelah mengirim pendaftaran, berkas PDF resmi formulir dan surat pernyataan akan otomatis siap dicetak.
+        Setelah mengirim pendaftaran, berkas PDF resmi formulir dan surat
+        pernyataan akan otomatis siap dicetak.
       </p>
     </form>
   );

@@ -2,13 +2,24 @@ import Link from "next/link";
 import { ArrowRight, BellRinging } from "@phosphor-icons/react/dist/ssr";
 import { Reveal } from "@/components/ui/reveal";
 import { FlourishDivider } from "@/components/ui/flourish-divider";
-import { REGISTRATION_CONFIG } from "@/lib/pendaftaran-config";
+import { registrationConfig } from "@/lib/pendaftaran-config";
 
-const { isOpen, statusLabel, heroTitle, heroDesc, ctaLabel } = REGISTRATION_CONFIG;
-
-export function PendaftaranSection() {
+export function PendaftaranSection({
+  isOpen,
+  period,
+}: {
+  isOpen: boolean;
+  period: string;
+}) {
+  const { statusLabel, heroTitle, heroDesc, ctaLabel } = registrationConfig(
+    isOpen,
+    period,
+  );
   return (
-    <section id="pendaftaran" className="scroll-mt-16 bg-white py-20 sm:pb-28 sm:pt-20">
+    <section
+      id="pendaftaran"
+      className="scroll-mt-16 bg-white py-20 sm:pb-28 sm:pt-20"
+    >
       <div className="mx-auto max-w-6xl px-6">
         <Reveal className="relative overflow-hidden rounded-3xl bg-zinc-950 border border-white/10 shadow-2xl shadow-black/40">
           {/* Ambient glowing orbs */}
@@ -45,7 +56,10 @@ export function PendaftaranSection() {
               </Reveal>
             </div>
 
-            <Reveal delay={440} className="flex shrink-0 flex-col gap-3 sm:items-end">
+            <Reveal
+              delay={440}
+              className="flex shrink-0 flex-col gap-3 sm:items-end"
+            >
               <Link
                 href="/pendaftaran"
                 className={`group inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-bold shadow-[0_0_32px_-6px_rgba(251,191,36,0.55)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
@@ -55,7 +69,11 @@ export function PendaftaranSection() {
                 }`}
               >
                 {ctaLabel}
-                <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-1" />
+                <ArrowRight
+                  size={16}
+                  weight="bold"
+                  className="transition-transform duration-200 group-hover:translate-x-1"
+                />
               </Link>
               <p className="inline-flex items-center gap-1.5 text-xs text-white/50">
                 <BellRinging size={14} />
