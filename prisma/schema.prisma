@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MemberGroup {
+  pembina
+  pimpinan
+  sekretariat
+  bendahara
+  delegasi
+  hh
+  psdm
+  kominfo
+}
+
+enum RegistrationSource {
+  web
+  spreadsheet
+}
+
+model AdminUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  authId    String   @unique @db.Uuid
+  email     String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Member {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  role        String
+  group       MemberGroup
+  photoPath   String?
+  sortOrder   Int         @default(0)
+  isPublished Boolean     @default(true)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, group, sortOrder])
+}
+
+model GalleryPhoto {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  alt         String
+  imagePath   String
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, sortOrder])
+}
+
+model Registration {
+  id                   String             @id @default(uuid()) @db.Uuid
+  nama                 String
+  nim                  String
+  angkatan             String
+  period               String
+  tempatTanggalLahir   String             @default("")
+  jenisKelamin         String             @default("")
+  alamat               String             @default("")
+  noHp                 String             @default("")
+  idLine               String             @default("")
+  pengalamanOrganisasi String             @default("")
+  minatSkill           String             @default("")
+  alasanBergabung       String             @default("")
+  divisi               String
+  alasanDivisi         String             @default("")
+  berkas               String?
+  berkasPath           String?
+  berkasSize           Int?
+  source               RegistrationSource @default(web)
+  submittedAt          DateTime?          @db.Timestamptz(3)
+  createdAt            DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@unique([nim, period])
+  @@index([period, submittedAt])
+}
+
+model HeroSlide {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  alt         String
+  imagePath   String
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, sortOrder])
+}
+
+enum ProgramStatus {
+  upcoming
+  open
+  closed
+}
+
+model Program {
+  programPeriod ProgramPeriod @relation(fields: [period], references: [period], onDelete: Restrict, onUpdate: Cascade)
+  id String @id @default(uuid()) @db.Uuid
+  title String
+  body String
+  fullDescription String @default("")
+  period String
+  executionDate String @default("")
+  time String @default("")
+  location String @default("")
+  status ProgramStatus @default(upcoming)
+  icon String @default("code")
+  gformLink String @default("")
+  speakers String[] @default([])
+  benefits String[] @default([])
+  price String @default("")
+  contactPerson String @default("")
+  imagePath String?
+  sortOrder Int @default(0)
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([isPublished, period, sortOrder])
+}
+
+model ProgramPeriod {
+  period String @id
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  programs Program[]
+}
+model RegistrationSettings {
+  id String @id @default("main")
+  isOpen Boolean @default(true)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
