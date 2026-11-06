@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import type { GalleryPhoto } from "@/domain/admin";
 
 interface GalleryGridProps {
-  photos: string[];
+  photos: GalleryPhoto[];
   initialCount?: number;
   step?: number;
 }
@@ -25,15 +26,16 @@ export function GalleryGrid({
 
   return (
     <div className="flex flex-col items-center">
+      {photos.length === 0 && <p className="py-12 text-center text-zinc-600">Belum ada dokumentasi kegiatan yang dipublikasikan.</p>}
       <div className="grid w-full grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-        {visiblePhotos.map((src, index) => (
+        {visiblePhotos.map((photo) => (
           <div
-            key={src}
+            key={photo.id}
             className="group relative h-0 w-full overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-100 pt-[100%] shadow-sm transition-all duration-300 hover:border-amber-400/50 hover:shadow-lg hover:shadow-zinc-300/40"
           >
             <Image
-              src={src}
-              alt={`Dokumentasi kegiatan HIMA TI #${index + 1}`}
+              src={photo.imageUrl}
+              alt={photo.alt}
               fill
               sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"

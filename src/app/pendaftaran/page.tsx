@@ -9,9 +9,9 @@ import {
 import Link from "next/link";
 import { DetailHeader } from "@/components/detail/detail-header";
 import { RegistrationForm } from "@/components/pendaftaran/registration-form";
-import { REGISTRATION_CONFIG, DIVISI_OPTIONS } from "@/lib/pendaftaran-config";
+import { registrationConfig, DIVISI_OPTIONS } from "@/lib/pendaftaran-config";
 
-const { isOpen, statusLabel, pageDesc } = REGISTRATION_CONFIG;
+import { loadRegistrationSettings } from "@/data/registration-settings";
 
 const alur = [
   {
@@ -34,16 +34,21 @@ const alur = [
   },
 ];
 
-export default function PendaftaranPage() {
+export default async function PendaftaranPage() {
+  const settings = await loadRegistrationSettings();
+  const period = process.env.REGISTRATION_PERIOD || "2026";
+  const { isOpen, statusLabel, pageDesc } = registrationConfig(
+    settings.isOpen,
+    period,
+  );
   return (
     <>
       <DetailHeader
         title="Pendaftaran Fungsionaris"
-        description="Pendaftaran resmi fungsionaris HIMA TI Undiknas periode 2026. Lengkapi formulir dan pilih divisi yang diminati."
+        description={`Pendaftaran resmi fungsionaris HIMA TI Undiknas periode ${period}. ${isOpen ? "Lengkapi formulir dan pilih divisi yang diminati." : "Pendaftaran sedang ditutup."}`}
       />
 
       <div className="mx-auto max-w-5xl px-6 pb-20 pt-12">
-
         {/* ── Hero Banner ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden rounded-3xl bg-zinc-950 border border-white/10 shadow-2xl shadow-black/40">
           {/* Decorative ambient lighting */}
@@ -53,11 +58,13 @@ export default function PendaftaranPage() {
           <div className="relative z-10 grid gap-8 p-8 sm:grid-cols-[1fr_auto] sm:items-center sm:p-12">
             <div>
               {/* Badge */}
-              <span className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-black uppercase tracking-widest backdrop-blur-md ${
-                isOpen
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                  : "border-amber-400/30 bg-amber-400/10 text-amber-400"
-              }`}>
+              <span
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-black uppercase tracking-widest backdrop-blur-md ${
+                  isOpen
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                    : "border-amber-400/30 bg-amber-400/10 text-amber-400"
+                }`}
+              >
                 <span
                   className={`h-2 w-2 rounded-full ${
                     isOpen ? "bg-emerald-400" : "bg-amber-400"
@@ -67,9 +74,15 @@ export default function PendaftaranPage() {
               </span>
 
               <h2 className="mt-5 max-w-md text-2xl font-bold leading-snug tracking-tight text-white sm:text-3xl">
-                {isOpen
-                  ? <>Pendaftaran Fungsionaris<br />HIMA TI 2026 Dibuka</>
-                  : "Pendaftaran Sedang Ditutup"}
+                {isOpen ? (
+                  <>
+                    Pendaftaran Fungsionaris
+                    <br />
+                    HIMA TI {period} Dibuka
+                  </>
+                ) : (
+                  "Pendaftaran Sedang Ditutup"
+                )}
               </h2>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-300">
                 {pageDesc}
@@ -81,9 +94,15 @@ export default function PendaftaranPage() {
                 href="#formulir"
                 className="group flex shrink-0 flex-col items-center gap-2.5 rounded-2xl bg-amber-400 p-6 text-center shadow-[0_0_48px_-8px_rgba(251,191,36,0.55)] transition-all duration-200 hover:bg-amber-300 hover:shadow-[0_0_56px_-6px_rgba(251,191,36,0.85)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 sm:w-36"
               >
-                <ClipboardText size={26} weight="bold" className="text-zinc-950 transition-transform duration-300 group-hover:scale-110" />
+                <ClipboardText
+                  size={26}
+                  weight="bold"
+                  className="text-zinc-950 transition-transform duration-300 group-hover:scale-110"
+                />
                 <span className="text-sm font-black text-zinc-950 leading-tight">
-                  Daftar<br />Sekarang
+                  Daftar
+                  <br />
+                  Sekarang
                 </span>
               </a>
             ) : (
@@ -91,9 +110,15 @@ export default function PendaftaranPage() {
                 href="/#kontak"
                 className="flex shrink-0 flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-6 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:w-36"
               >
-                <BellRinging size={26} weight="bold" className="text-white/40" />
+                <BellRinging
+                  size={26}
+                  weight="bold"
+                  className="text-white/40"
+                />
                 <span className="text-sm font-semibold text-white/40 leading-tight">
-                  Pantau<br />Info
+                  Pantau
+                  <br />
+                  Info
                 </span>
               </Link>
             )}
@@ -127,8 +152,12 @@ export default function PendaftaranPage() {
                   weight="bold"
                   className="text-zinc-400 transition-colors duration-200 group-hover:text-amber-500"
                 />
-                <p className="mt-3 font-heading font-bold text-zinc-900">{step.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-500">{step.body}</p>
+                <p className="mt-3 font-heading font-bold text-zinc-900">
+                  {step.title}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                  {step.body}
+                </p>
               </div>
             ))}
           </div>
@@ -148,12 +177,18 @@ export default function PendaftaranPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/15 text-amber-600 transition-transform duration-300 group-hover:scale-110">
                   <Users size={16} weight="bold" />
                 </div>
-                <p className="font-heading font-bold text-sm text-zinc-900">{d.label}</p>
-                <p className="text-[11px] leading-relaxed text-zinc-500">{d.desc}</p>
+                <p className="font-heading font-bold text-sm text-zinc-900">
+                  {d.label}
+                </p>
+                <p className="text-[11px] leading-relaxed text-zinc-500">
+                  {d.desc}
+                </p>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-zinc-400">* Wajib memilih minimal 2 divisi</p>
+          <p className="mt-3 text-xs text-zinc-400">
+            * Wajib memilih minimal 2 divisi
+          </p>
         </div>
 
         {/* ── Formulir ────────────────────────────────────────────── */}
@@ -177,29 +212,44 @@ export default function PendaftaranPage() {
               <div className="flex items-center justify-between bg-zinc-950 px-8 py-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400">
-                    <ClipboardText size={18} weight="bold" className="text-zinc-950" />
+                    <ClipboardText
+                      size={18}
+                      weight="bold"
+                      className="text-zinc-950"
+                    />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white">Formulir Pendaftaran</p>
-                    <p className="text-[11px] text-white/40">Isi data diri dan tentukan divisi secara teliti</p>
+                    <p className="text-sm font-bold text-white">
+                      Formulir Pendaftaran
+                    </p>
+                    <p className="text-[11px] text-white/40">
+                      Isi data diri dan tentukan divisi secara teliti
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Card body */}
               <div className="bg-white px-8 py-10 sm:px-10">
-                <RegistrationForm />
+                <RegistrationForm period={period} />
               </div>
             </div>
           </div>
         ) : (
           <div className="mt-16 flex flex-col items-center gap-4 rounded-3xl border border-dashed border-zinc-200 py-20 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100">
-              <BellRinging size={28} weight="duotone" className="text-zinc-300" />
+              <BellRinging
+                size={28}
+                weight="duotone"
+                className="text-zinc-300"
+              />
             </div>
-            <p className="font-semibold text-zinc-400">Formulir tidak tersedia saat ini</p>
+            <p className="font-semibold text-zinc-400">
+              Formulir tidak tersedia saat ini
+            </p>
             <p className="max-w-xs text-xs text-zinc-400">
-              Follow Instagram kami untuk mendapatkan notifikasi ketika pendaftaran dibuka kembali.
+              Follow Instagram kami untuk mendapatkan notifikasi ketika
+              pendaftaran dibuka kembali.
             </p>
           </div>
         )}

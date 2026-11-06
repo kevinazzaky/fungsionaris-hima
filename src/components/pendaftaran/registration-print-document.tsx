@@ -1,25 +1,8 @@
 "use client";
 
 import Image from "next/image";
-
-export interface RegistrationDocumentData {
-  nama: string;
-  nim: string;
-  tempatTanggalLahir: string;
-  jenisKelamin: string;
-  alamat: string;
-  noHp: string;
-  idLine: string;
-  pengalaman1?: string;
-  pengalaman2?: string;
-  pengalaman3?: string;
-  minatSkill: string;
-  alasanBergabung: string;
-  divisi: string;
-  alasanDivisi: string;
-  fotoUrl?: string;
-  tanggalDaftar?: string;
-}
+import type { RegistrationDocumentData } from "@/domain/registration-document";
+export type { RegistrationDocumentData } from "@/domain/registration-document";
 
 interface RegistrationPrintDocumentProps {
   data: RegistrationDocumentData;
@@ -48,7 +31,7 @@ export function RegistrationPrintDocument({
       <div className="print-page relative min-h-[1050px] bg-white p-8 sm:p-12 print:p-0 print:min-h-0 print-page-break">
         {/* Kop Surat */}
         <div className="flex items-center justify-between gap-4 border-b-2 border-zinc-900 pb-2">
-          <div className="relative h-20 w-16 shrink-0 sm:h-24 sm:w-20">
+          <div className="relative h-20 w-16 shrink-0 sm:h-24 sm:w-20 print:h-20 print:w-16">
             <Image
               src="/brand/himati-doc-logo.png"
               alt="Logo HIMA TI"
@@ -79,7 +62,7 @@ export function RegistrationPrintDocument({
             </p>
           </div>
 
-          <div className="relative h-20 w-16 shrink-0 sm:h-24 sm:w-20">
+          <div className="relative h-20 w-16 shrink-0 sm:h-24 sm:w-20 print:h-20 print:w-16">
             <Image
               src="/brand/undiknas-logo.png"
               alt="Logo Undiknas"
@@ -119,7 +102,7 @@ export function RegistrationPrintDocument({
           </div>
 
           {/* Identity Fields */}
-          <div className="pr-28 space-y-1.5 text-xs sm:text-[13px]">
+          <div className="pr-28 space-y-1.5 text-xs sm:text-[13px] print:text-xs print:space-y-1">
             <div className="grid grid-cols-[150px_10px_1fr]">
               <span className="font-semibold">Nama</span>
               <span>:</span>
@@ -159,7 +142,7 @@ export function RegistrationPrintDocument({
         </div>
 
         {/* Extended Questionnaire */}
-        <div className="mt-3 space-y-2.5 text-xs sm:text-[13px]">
+        <div className="mt-3 space-y-2.5 text-xs sm:text-[13px] print:text-xs print:space-y-2">
           <div>
             <span className="font-semibold">Pengalaman Berorganisasi :</span>
             <ol className="mt-0.5 list-decimal pl-5 space-y-0.5 text-zinc-800">
@@ -174,7 +157,7 @@ export function RegistrationPrintDocument({
 
           <div>
             <span className="font-semibold">Minat dan skill :</span>
-            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300">
+            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300 print:p-1 print:min-h-0 print:leading-normal">
               {data.minatSkill || "-"}
             </p>
           </div>
@@ -184,7 +167,7 @@ export function RegistrationPrintDocument({
               Alasan bergabung dengan Himpunan Mahasiswa Program Studi Teknologi
               Informasi UNDIKNAS Denpasar :
             </span>
-            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300">
+            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300 print:p-1 print:min-h-0 print:leading-normal">
               {data.alasanBergabung || "-"}
             </p>
           </div>
@@ -202,7 +185,7 @@ export function RegistrationPrintDocument({
             <span className="font-semibold">
               Alasan memilih divisi tersebut :
             </span>
-            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300">
+            <p className="mt-0.5 rounded border border-zinc-200 bg-zinc-50/50 p-2 text-zinc-800 leading-relaxed min-h-[38px] whitespace-pre-wrap print:border-zinc-300 print:p-1 print:min-h-0 print:leading-normal">
               {data.alasanDivisi || "-"}
             </p>
           </div>
@@ -212,13 +195,13 @@ export function RegistrationPrintDocument({
         <div className="mt-3">
           <p className="text-justify text-[11px] sm:text-xs leading-relaxed text-zinc-800">
             Dengan ini, saya menyatakan berminat sepenuh hati untuk menjadi
-            fungsionaris Himpunan Mahasiswa Program Studi Teknologi Informasi
-            2026 dan bersedia memenuhi segala bentuk tugas & tanggung jawab
-            dalam fungsionaris Himpunan Mahasiswa Program Studi Teknologi
-            Informasi UNDIKNAS Denpasar. Serta, saya berkomitmen untuk tidak
-            mengundurkan diri dari organisasi ini setelah resmi diterima sebagai
-            anggota fungsionaris, termasuk ketika sudah mulai mengikuti program
-            kerja atau kegiatan yang telah/akan dijalankan oleh Himpunan
+            fungsionaris Himpunan Mahasiswa Program Studi Teknologi Informasi{" "}
+            {data.period || "2026"} dan bersedia memenuhi segala bentuk tugas &
+            tanggung jawab dalam fungsionaris Himpunan Mahasiswa Program Studi
+            Teknologi Informasi UNDIKNAS Denpasar. Serta, saya berkomitmen untuk
+            tidak mengundurkan diri dari organisasi ini setelah resmi diterima
+            sebagai anggota fungsionaris, termasuk ketika sudah mulai mengikuti
+            program kerja atau kegiatan yang telah/akan dijalankan oleh Himpunan
             Mahasiswa Program Studi Teknologi Informasi. Dengan ini, saya
             menyatakan bersedia menjalankan tugas dan tanggung jawab sebagai
             anggota fungsionaris hingga masa kepengurusan berakhir.
@@ -226,7 +209,7 @@ export function RegistrationPrintDocument({
         </div>
 
         {/* Signature Box */}
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end break-inside-avoid">
           <div className="text-center text-xs sm:text-[13px] w-48">
             <p>Denpasar, {tanggal}</p>
             <p className="mt-1">Hormat Saya,</p>
@@ -350,7 +333,7 @@ export function RegistrationPrintDocument({
         </div>
 
         {/* Signature Box */}
-        <div className="mt-12 flex justify-end">
+        <div className="mt-12 flex justify-end break-inside-avoid">
           <div className="text-center text-xs sm:text-sm w-48">
             <p>Denpasar, {tanggal}</p>
             <p className="mt-1">Hormat Saya,</p>

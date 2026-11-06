@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Figtree, Geist_Mono, Playfair_Display, Poppins, Rubik } from "next/font/google";
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
-import { RegistrationFloatingCta } from "@/components/ui/registration-floating-cta";
+import { SiteChrome } from "@/components/layout/site-chrome";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -158,10 +156,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             }),
           }}
         />
-        <Navbar />
-        <main className="flex flex-1 flex-col">{children}</main>
-        <Footer />
-        <RegistrationFloatingCta />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

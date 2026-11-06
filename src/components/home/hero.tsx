@@ -3,18 +3,17 @@ import Image from "next/image";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { HeroSlideshow } from "@/components/home/hero-slideshow";
 
-const heroPhotos = [
-  "/gallery/gallery-01.webp",
-  "/gallery/gallery-14.webp",
-  "/hero/foto-3.jpg",
-];
+import type { GalleryPhoto } from "@/domain/admin";
 
-export function Hero() {
+export function Hero({ images }: { images: GalleryPhoto[] }) {
   return (
     <section className="relative flex min-h-[90dvh] items-end overflow-hidden bg-zinc-950">
       <HeroSlideshow
-        images={heroPhotos}
-        alt="Dokumentasi kegiatan Himpunan Mahasiswa Teknologi Informasi"
+        key={images.map((image) => image.id).join(",")}
+        images={images.map((image) => ({
+          src: image.imageUrl,
+          alt: image.alt,
+        }))}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/80 via-zinc-950/20 to-transparent" />

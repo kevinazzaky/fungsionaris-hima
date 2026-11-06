@@ -12,11 +12,7 @@ export function Reveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
@@ -42,7 +38,7 @@ export function Reveal({
       style={{ transitionDelay: visible ? `${delay}ms` : "0ms" }}
       className={`transition-all duration-700 ease-out ${
         visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-      } ${className ?? ""}`}
+      } motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:transition-none ${className ?? ""}`}
     >
       {children}
     </div>

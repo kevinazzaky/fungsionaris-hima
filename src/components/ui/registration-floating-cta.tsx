@@ -5,15 +5,43 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Megaphone, X } from "@phosphor-icons/react/dist/ssr";
 import { motion, AnimatePresence } from "motion/react";
-import { REGISTRATION_CONFIG } from "@/lib/pendaftaran-config";
 
 export function RegistrationFloatingCta() {
   const pathname = usePathname();
+  const [isOpen, setOpen] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    let latest = 0;
+    const refresh = () => {
+      const id = ++latest;
+      fetch("/api/pendaftaran/status", {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error();
+          return response.json();
+        })
+        .then((result: { isOpen: boolean }) => {
+          if (!controller.signal.aborted && id === latest)
+            setOpen(result.isOpen === true);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted && id === latest) setOpen(false);
+        });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refresh);
+    };
+  }, [pathname]);
   const [isVisible, setIsVisible] = useState(false);
   const reappearTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (REGISTRATION_CONFIG.isOpen && pathname !== "/pendaftaran") {
+    if (isOpen && pathname !== "/pendaftaran") {
       // Munculkan pertama kali dengan delay halus setelah halaman loading
       const initialTimer = setTimeout(() => {
         setIsVisible(true);
@@ -21,7 +49,7 @@ export function RegistrationFloatingCta() {
 
       return () => clearTimeout(initialTimer);
     }
-  }, [pathname]);
+  }, [pathname, isOpen]);
 
   // Bersihkan timer kemunculan ulang saat unmount
   useEffect(() => {
@@ -53,7 +81,7 @@ export function RegistrationFloatingCta() {
   // Jangan tampilkan jika:
   // 1. Pendaftaran sedang ditutup
   // 2. User sedang berada di halaman /pendaftaran
-  if (!REGISTRATION_CONFIG.isOpen || pathname === "/pendaftaran") {
+  if (!isOpen || pathname === "/pendaftaran") {
     return null;
   }
 
@@ -103,7 +131,7 @@ export function RegistrationFloatingCta() {
                   </span>
                 </div>
                 <p className="font-heading text-xs sm:text-sm font-bold text-white transition-colors group-hover:text-amber-300">
-                  Daftar HIMA TI 2026
+                  Daftar HIMA TI
                 </p>
               </div>
 

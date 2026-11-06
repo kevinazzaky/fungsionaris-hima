@@ -18,6 +18,7 @@ import type { IconProps } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 
 export interface ProgramItem {
+  id: string;
   icon: ComponentType<IconProps>;
   title: string;
   body: string;
@@ -121,17 +122,23 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                         </span>
-                        <span className="text-emerald-400">{program.statusText}</span>
+                        <span className="text-emerald-400">
+                          {program.statusText}
+                        </span>
                       </>
                     ) : program.status === "upcoming" ? (
                       <>
                         <span className="h-2 w-2 rounded-full bg-amber-400" />
-                        <span className="text-amber-300">{program.statusText}</span>
+                        <span className="text-amber-300">
+                          {program.statusText}
+                        </span>
                       </>
                     ) : (
                       <>
                         <span className="h-2 w-2 rounded-full bg-zinc-400" />
-                        <span className="text-zinc-300">{program.statusText}</span>
+                        <span className="text-zinc-300">
+                          {program.statusText}
+                        </span>
                       </>
                     )}
                   </div>
@@ -147,17 +154,23 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                     {program.status === "open" ? (
                       <>
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-emerald-700">{program.statusText}</span>
+                        <span className="text-emerald-700">
+                          {program.statusText}
+                        </span>
                       </>
                     ) : program.status === "upcoming" ? (
                       <>
                         <span className="h-2 w-2 rounded-full bg-amber-500" />
-                        <span className="text-amber-800">{program.statusText}</span>
+                        <span className="text-amber-800">
+                          {program.statusText}
+                        </span>
                       </>
                     ) : (
                       <>
                         <span className="h-2 w-2 rounded-full bg-zinc-400" />
-                        <span className="text-zinc-600">{program.statusText}</span>
+                        <span className="text-zinc-600">
+                          {program.statusText}
+                        </span>
                       </>
                     )}
                   </div>
@@ -241,31 +254,43 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                   program.status === "open"
                     ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
                     : program.status === "upcoming"
-                    ? "border-amber-200 bg-amber-50/70 text-amber-950"
-                    : "border-zinc-200 bg-zinc-100/70 text-zinc-800"
+                      ? "border-amber-200 bg-amber-50/70 text-amber-950"
+                      : "border-zinc-200 bg-zinc-100/70 text-zinc-800"
                 }`}
               >
                 {program.status === "open" ? (
-                  <CheckCircle size={22} weight="fill" className="shrink-0 text-emerald-600" />
+                  <CheckCircle
+                    size={22}
+                    weight="fill"
+                    className="shrink-0 text-emerald-600"
+                  />
                 ) : program.status === "upcoming" ? (
-                  <Circle size={22} weight="bold" className="shrink-0 text-amber-600" />
+                  <Circle
+                    size={22}
+                    weight="bold"
+                    className="shrink-0 text-amber-600"
+                  />
                 ) : (
-                  <CheckCircle size={22} weight="fill" className="shrink-0 text-zinc-500" />
+                  <CheckCircle
+                    size={22}
+                    weight="fill"
+                    className="shrink-0 text-zinc-500"
+                  />
                 )}
                 <div>
                   <p className="text-xs font-bold">
                     {program.status === "open"
                       ? "Pendaftaran Sedang Dibuka"
                       : program.status === "upcoming"
-                      ? "Pendaftaran Belum Dibuka"
-                      : "Pendaftaran Telah Ditutup"}
+                        ? "Pendaftaran Belum Dibuka"
+                        : "Pendaftaran Telah Ditutup"}
                   </p>
                   <p className="mt-0.5 text-xs opacity-80">
                     {program.status === "open"
                       ? "Segera amankan tiket dan slot pendaftaran Anda sekarang."
                       : program.status === "upcoming"
-                      ? "Informasi pembukaan registrasi akan diumumkan menjelang pelaksanaan."
-                      : "Kegiatan ini telah selesai dilaksanakan pada periode yang bersangkutan."}
+                        ? "Informasi pembukaan registrasi akan diumumkan menjelang pelaksanaan."
+                        : "Kegiatan ini telah selesai dilaksanakan pada periode yang bersangkutan."}
                   </p>
                 </div>
               </div>
@@ -275,7 +300,7 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
                   Tentang Program Kerja
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-700">
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
                   {program.fullDescription || program.body}
                 </p>
               </div>
@@ -284,29 +309,41 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
               {program.extraDetails && (
                 <div className="space-y-4 rounded-2xl border border-zinc-200/80 bg-zinc-50/50 p-5">
                   {/* Speakers list */}
-                  {program.extraDetails.speakers && program.extraDetails.speakers.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-700">
-                        <Users size={16} weight="bold" className="text-amber-600" />
-                        <span>Narasumber & Moderator</span>
+                  {program.extraDetails.speakers &&
+                    program.extraDetails.speakers.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-700">
+                          <Users
+                            size={16}
+                            weight="bold"
+                            className="text-amber-600"
+                          />
+                          <span>Narasumber & Moderator</span>
+                        </div>
+                        <ul className="mt-2 space-y-1.5 text-xs text-zinc-700">
+                          {program.extraDetails.speakers.map((speaker) => (
+                            <li
+                              key={speaker}
+                              className="flex items-start gap-2"
+                            >
+                              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                              <span>{speaker}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="mt-2 space-y-1.5 text-xs text-zinc-700">
-                        {program.extraDetails.speakers.map((speaker) => (
-                          <li key={speaker} className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                            <span>{speaker}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    )}
 
                   {/* Pricing & Benefits */}
                   <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
                     {program.extraDetails.price && (
                       <div>
                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-700">
-                          <Tag size={16} weight="bold" className="text-amber-600" />
+                          <Tag
+                            size={16}
+                            weight="bold"
+                            className="text-amber-600"
+                          />
                           <span>Biaya Registrasi</span>
                         </div>
                         <p className="mt-1.5 text-sm font-bold text-zinc-950">
@@ -328,24 +365,29 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                   </div>
 
                   {/* Benefits */}
-                  {program.extraDetails.benefits && program.extraDetails.benefits.length > 0 && (
-                    <div className="pt-2">
-                      <div className="text-xs font-bold uppercase tracking-wider text-zinc-700">
-                        Benefit Peserta
+                  {program.extraDetails.benefits &&
+                    program.extraDetails.benefits.length > 0 && (
+                      <div className="pt-2">
+                        <div className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+                          Benefit Peserta
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {program.extraDetails.benefits.map((benefit) => (
+                            <span
+                              key={benefit}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-2xs"
+                            >
+                              <Check
+                                size={12}
+                                weight="bold"
+                                className="text-amber-600"
+                              />
+                              {benefit}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {program.extraDetails.benefits.map((benefit) => (
-                          <span
-                            key={benefit}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-2xs"
-                          >
-                            <Check size={12} weight="bold" className="text-amber-600" />
-                            {benefit}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               )}
             </div>
@@ -367,7 +409,7 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                   rel="noopener noreferrer"
                   className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-200 hover:bg-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-95"
                 >
-                  Daftar Sekarang (Google Form)
+                  Daftar Sekarang
                   <ArrowSquareOut size={16} weight="bold" />
                 </a>
               ) : program.status === "upcoming" ? (

@@ -1,10 +1,13 @@
 import { DetailHeader } from "@/components/detail/detail-header";
 import { HierarchyLadder } from "@/components/fungsionaris/hierarchy-ladder";
 import { BalineseDivider, BalineseWatermark } from "@/components/ui/balinese-ornaments";
+import { loadPublicContent } from "@/data/public-content";
+import { PublicContentProvider } from "@/components/public-content-provider";
 
-export default function FungsionarisPage() {
+export default async function FungsionarisPage() {
+  const content = await loadPublicContent();
   return (
-    <>
+    <PublicContentProvider {...content}>
       <DetailHeader
         title="Susunan Fungsionaris"
         description="Bagan struktur kepengurusan dan susunan fungsionaris Himpunan Mahasiswa Teknologi Informasi, Universitas Pendidikan Nasional periode 2026."
@@ -42,6 +45,6 @@ export default function FungsionarisPage() {
           <HierarchyLadder />
         </div>
       </section>
-    </>
+    </PublicContentProvider>
   );
 }
