@@ -10,6 +10,7 @@ const links = [
   ["/admin/fungsionaris", "Fungsionaris"],
   ["/admin/galeri", "Galeri"],
   ["/admin/program-kerja", "Program kerja"],
+  ["/admin/voting", "Pemilihan Ketua"],
   ["/admin/akun", "Akun admin"],
 ];
 
