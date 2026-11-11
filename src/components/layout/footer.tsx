@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {

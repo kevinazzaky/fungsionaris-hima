@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { List, X } from "@phosphor-icons/react/dist/ssr";
-import { scrollToSection } from "@/lib/smooth-scroll";
 
 const navLinks = [
   { id: "about", label: "Tentang" },
@@ -13,15 +11,13 @@ const navLinks = [
   { id: "kontak", label: "Kontak" },
 ];
 
-export function MobileMenu() {
+export function MobileMenu({ navigateSection }: { navigateSection: (id: string) => void }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-  const router = useRouter();
 
   const handleLinkClick = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     setOpen(false);
-    scrollToSection(id, pathname, router);
+    navigateSection(id);
   };
 
   return (

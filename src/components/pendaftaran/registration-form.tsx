@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { PendingLabel } from "@/components/ui/pending-label";
 import { createPortal } from "react-dom";
 import {
   ArrowRight,
@@ -42,6 +43,7 @@ export function RegistrationForm({ period }: { period: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const submitting = useRef(false);
 
   const MAX_MB = 3;
   const MAX_BYTES = MAX_MB * 1024 * 1024;
@@ -97,12 +99,14 @@ export function RegistrationForm({ period }: { period: string }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting.current) return;
 
     if (selectedDivisi.length < 1) {
       setErrorMsg("Pilih minimal 1 divisi yang diminati.");
       return;
     }
 
+    submitting.current = true;
     setStatus("loading");
     setErrorMsg("");
 
@@ -192,6 +196,8 @@ export function RegistrationForm({ period }: { period: string }) {
         "Gagal terhubung ke server. Silakan coba beberapa saat lagi.",
       );
       setStatus("error");
+    } finally {
+      submitting.current = false;
     }
   }
 
@@ -392,8 +398,10 @@ export function RegistrationForm({ period }: { period: string }) {
     <form
       ref={formRef}
       onSubmit={handleSubmit}
+      aria-busy={status === "loading"}
       className="flex flex-col gap-8 no-print"
     >
+      <fieldset disabled={status === "loading"} className="contents">
       {/* ── SEKSI 1: Data Diri & Kontak ── */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
@@ -910,8 +918,7 @@ export function RegistrationForm({ period }: { period: string }) {
       >
         {status === "loading" ? (
           <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            <span>Memproses Pendaftaran...</span>
+            <PendingLabel pending text="Mengirim pendaftaran…">Kirim pendaftaran</PendingLabel>
           </>
         ) : (
           <>
@@ -929,6 +936,7 @@ export function RegistrationForm({ period }: { period: string }) {
         Setelah mengirim pendaftaran, berkas PDF resmi formulir dan surat
         pernyataan akan otomatis siap dicetak.
       </p>
+      </fieldset>
     </form>
   );
 }

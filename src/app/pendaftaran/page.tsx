@@ -6,7 +6,7 @@ import {
   Megaphone,
   Users,
 } from "@phosphor-icons/react/dist/ssr";
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 import { DetailHeader } from "@/components/detail/detail-header";
 import { RegistrationForm } from "@/components/pendaftaran/registration-form";
 import { registrationConfig, DIVISI_OPTIONS } from "@/lib/pendaftaran-config";

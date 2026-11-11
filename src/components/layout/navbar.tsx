@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { NavigationFeedback } from "@/components/ui/navigation-feedback";
 import { MobileMenu } from "@/components/layout/mobile-menu";
 import { ScrollProgress } from "@/components/ui/scroll-progress";
 import { scrollToSection } from "@/lib/smooth-scroll";
@@ -18,10 +20,15 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const navigateSection = (id: string) => {
+    if (pending) return;
+    startTransition(() => scrollToSection(id, pathname, router));
+  };
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
-    scrollToSection(id, pathname, router);
+    navigateSection(id);
   };
 
   const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -69,15 +76,17 @@ export function Navbar() {
         <div className="hidden md:block">
           <button
             type="button"
-            onClick={() => scrollToSection("pendaftaran", pathname, router)}
+            disabled={pending}
+            onClick={() => navigateSection("pendaftaran")}
             className="inline-flex items-center justify-center rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-[0_0_20px_-4px_rgba(251,191,36,0.45)] transition-all duration-200 hover:bg-amber-300 hover:shadow-[0_0_28px_-4px_rgba(251,191,36,0.7)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
           >
             Gabung
           </button>
         </div>
 
-        <MobileMenu />
+        <MobileMenu navigateSection={navigateSection} />
       </nav>
+      <NavigationFeedback pending={pending} />
       <ScrollProgress />
     </header>
   );

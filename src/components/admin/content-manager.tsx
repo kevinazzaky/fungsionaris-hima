@@ -10,6 +10,7 @@ import {
 } from "@/domain/admin";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
+import { PendingLabel } from "@/components/ui/pending-label";
 
 type Item = Member | GalleryPhoto;
 type Kind = "members" | "gallery" | "hero";
@@ -20,6 +21,7 @@ export function ContentManager({ kind }: { kind: Kind }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Item | "new" | null>(null);
   const endpoint = `/api/admin/content/${kind}`;
@@ -55,6 +57,7 @@ export function ContentManager({ kind }: { kind: Kind }) {
   }, [load]);
 
   async function remove(item: Item) {
+    if (busy || inFlight.current) return;
     const name = "name" in item ? item.name : item.title;
     if (
       !window.confirm(
@@ -62,6 +65,7 @@ export function ContentManager({ kind }: { kind: Kind }) {
       )
     )
       return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -78,6 +82,7 @@ export function ContentManager({ kind }: { kind: Kind }) {
       setError(error instanceof Error ? error.message : "Data gagal dihapus.");
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
@@ -111,6 +116,7 @@ export function ContentManager({ kind }: { kind: Kind }) {
           {members ? "Tambah fungsionaris" : "Tambah foto"}
         </button>
       </header>
+      {busy && !editing && <p role="status"><PendingLabel pending text="Menghapus data…">Menghapus data</PendingLabel></p>}
       {notice && (
         <p className="admin-success" role="status">
           {notice}
@@ -121,13 +127,14 @@ export function ContentManager({ kind }: { kind: Kind }) {
           <p>{error}</p>
           <button
             className="admin-button"
+            disabled={loading || busy}
             onClick={() => {
               setLoading(true);
               setError("");
               void load();
             }}
           >
-            Muat ulang
+            <PendingLabel pending={loading} text="Memuat data…">Muat ulang</PendingLabel>
           </button>
         </div>
       )}
@@ -292,6 +299,7 @@ function ContentEditor({
   const [photoError, setPhotoError] = useState("");
   const [removePhoto, setRemovePhoto] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
   const members = kind === "members";
   const member = item && "name" in item ? item : null;
   const photo = item && "title" in item ? item : null;
@@ -313,7 +321,7 @@ function ContentEditor({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (photoError) return;
+    if (photoError || submitting.current) return;
     const form = new FormData(event.currentTarget);
     const file = form.get("file");
     if (file instanceof File && file.size > 3 * 1024 * 1024) {
@@ -337,6 +345,7 @@ function ContentEditor({
     if (item) body.set("id", item.id);
     if (file instanceof File && file.size) body.set("file", file);
     if (form.get("removePhoto") === "on") body.set("removePhoto", "true");
+    submitting.current = true;
     setSaving(true);
     onBusyChange(true);
     setError("");
@@ -352,12 +361,13 @@ function ContentEditor({
       );
     } finally {
       setSaving(false);
+      submitting.current = false;
       onBusyChange(false);
     }
   }
 
   return (
-    <form className="admin-form" onSubmit={submit}>
+    <form className="admin-form" onSubmit={submit} aria-busy={saving}>
       <fieldset disabled={saving}>
         {members ? (
           <>
@@ -559,7 +569,7 @@ function ContentEditor({
             type="submit"
             disabled={Boolean(photoError)}
           >
-            {saving ? "Menyimpan..." : "Simpan perubahan"}
+            <PendingLabel pending={saving} text="Menyimpan perubahan…">Simpan perubahan</PendingLabel>
           </button>
           <button className="admin-button" type="button" onClick={onCancel}>
             Batal

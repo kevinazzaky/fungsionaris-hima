@@ -10,8 +10,10 @@ import {
 } from "@/domain/programs";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
+import { PendingLabel } from "@/components/ui/pending-label";
 
 export function ProgramsManager() {
+  const inFlight = useRef(false);
   const [items, setItems] = useState<Program[]>([]);
   const [periods, setPeriods] = useState<ProgramPeriod[]>([]);
   const [addingPeriod, setAddingPeriod] = useState(false);
@@ -57,8 +59,9 @@ export function ProgramsManager() {
   );
   async function createPeriod(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || inFlight.current) return;
     const form = new FormData(event.currentTarget);
+    inFlight.current = true;
     setBusy(true);
     setPeriodError("");
     try {
@@ -84,10 +87,12 @@ export function ProgramsManager() {
       );
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
   async function togglePeriod() {
-    if (!currentPeriod || busy) return;
+    if (!currentPeriod || busy || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -114,6 +119,7 @@ export function ProgramsManager() {
       );
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
   useEffect(() => {
@@ -123,12 +129,13 @@ export function ProgramsManager() {
   }, [load]);
   async function remove(item: Program) {
     if (
-      busy ||
+      busy || inFlight.current ||
       !window.confirm(
         `Hapus program ${item.title} periode ${item.period}? Data dan foto program akan dihapus permanen.`,
       )
     )
       return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -147,6 +154,7 @@ export function ProgramsManager() {
       );
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
   const filtered = items.filter(
@@ -190,6 +198,7 @@ export function ProgramsManager() {
           </button>
         </div>
       </header>
+      {busy && !editing && !addingPeriod && <p role="status"><PendingLabel pending text="Memproses perubahan…">Memproses perubahan</PendingLabel></p>}
       {notice && (
         <p className="admin-success" role="status">
           {notice}
@@ -206,7 +215,7 @@ export function ProgramsManager() {
               void load();
             }}
           >
-            Muat ulang
+            <PendingLabel pending={loading} text="Memuat data…">Muat ulang</PendingLabel>
           </button>
         </div>
       )}
@@ -263,7 +272,7 @@ export function ProgramsManager() {
               )}
               <div className="admin-actions">
                 <button type="submit" className="admin-button primary">
-                  {busy ? "Menyimpan..." : "Simpan periode"}
+                  <PendingLabel pending={busy} text="Menyimpan periode…">Simpan periode</PendingLabel>
                 </button>
                 <button
                   type="button"
@@ -500,6 +509,7 @@ function ProgramEditor({
   const [photoError, setPhotoError] = useState(""),
     [removeImage, setRemoveImage] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
   useEffect(
     () => () => {
       if (selected) URL.revokeObjectURL(selected.url);
@@ -514,7 +524,7 @@ function ProgramEditor({
   }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (photoError || saving) return;
+    if (photoError || saving || submitting.current) return;
     const form = new FormData(event.currentTarget);
     const data: Record<string, unknown> = {
       sortOrder: Number(form.get("sortOrder")),
@@ -538,6 +548,7 @@ function ProgramEditor({
     const file = form.get("file");
     if (file instanceof File && file.size) body.set("file", file);
     if (removeImage) body.set("removeImage", "true");
+    submitting.current = true;
     setSaving(true);
     onBusy(true);
     setError("");
@@ -556,11 +567,12 @@ function ProgramEditor({
       );
     } finally {
       setSaving(false);
+      submitting.current = false;
       onBusy(false);
     }
   }
   return (
-    <form className="admin-form" onSubmit={submit}>
+    <form className="admin-form" onSubmit={submit} aria-busy={saving}>
       <fieldset disabled={saving}>
         {fields.map((field) => {
           const value = item?.[field.key];
@@ -747,7 +759,7 @@ function ProgramEditor({
             type="submit"
             disabled={Boolean(photoError)}
           >
-            {saving ? "Menyimpan..." : "Simpan program"}
+            <PendingLabel pending={saving} text="Menyimpan program…">Simpan program</PendingLabel>
           </button>
           <button className="admin-button" type="button" onClick={onCancel}>
             Batal

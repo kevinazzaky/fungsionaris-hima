@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PendingLabel } from "@/components/ui/pending-label";
 import type { RegistrationSettings } from "@/domain/registration-settings";
 import { requestJson } from "./request";
 
 export function RegistrationSettingsControl() {
+  const inFlight = useRef(false);
   const [settings, setSettings] = useState<RegistrationSettings | null>(null);
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false);
@@ -40,7 +42,8 @@ export function RegistrationSettingsControl() {
     return () => controller.abort();
   }, [load]);
   async function toggle() {
-    if (!settings || saving) return;
+    if (!settings || saving || inFlight.current) return;
+    inFlight.current = true;
     setSaving(true);
     setError("");
     setNotice("");
@@ -67,6 +70,7 @@ export function RegistrationSettingsControl() {
       );
     } finally {
       setSaving(false);
+      inFlight.current = false;
     }
   }
   return (
@@ -102,11 +106,9 @@ export function RegistrationSettingsControl() {
           <span className="admin-switch-track" aria-hidden="true">
             <span />
           </span>
-          {saving
-            ? "Menyimpan..."
-            : settings.isOpen
-              ? "Tutup pendaftaran"
-              : "Buka pendaftaran"}
+          <PendingLabel pending={saving} text="Menyimpan status…">
+            {settings.isOpen ? "Tutup pendaftaran" : "Buka pendaftaran"}
+          </PendingLabel>
         </button>
       )}
       {notice && (
