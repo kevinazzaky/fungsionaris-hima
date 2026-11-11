@@ -28,7 +28,7 @@ export function PendaftaranSection({
 
           <div className="relative z-10 flex flex-col gap-8 p-10 sm:flex-row sm:items-center sm:justify-between sm:p-14">
             <div className="max-w-lg">
-              <Reveal delay={140}>
+              <div>
                 <span
                   className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur-md ${
                     isOpen
@@ -43,21 +43,20 @@ export function PendaftaranSection({
                   />
                   {statusLabel}
                 </span>
-              </Reveal>
-              <Reveal delay={240}>
+              </div>
+              <div>
                 <h2 className="mt-5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                   {heroTitle}
                 </h2>
-              </Reveal>
-              <Reveal delay={340}>
+              </div>
+              <div>
                 <p className="mt-3 text-sm leading-relaxed text-zinc-300">
                   {heroDesc}
                 </p>
-              </Reveal>
+              </div>
             </div>
 
-            <Reveal
-              delay={440}
+            <div
               className="flex shrink-0 flex-col gap-3 sm:items-end"
             >
               <Link
@@ -79,7 +78,7 @@ export function PendaftaranSection({
                 <BellRinging size={14} />
                 Kami akan umumkan lewat Instagram
               </p>
-            </Reveal>
+            </div>
           </div>
         </Reveal>
 
