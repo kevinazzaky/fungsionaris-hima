@@ -13,6 +13,13 @@ export function isBackendConfigured() {
   );
 }
 
+export function isVotingConfigured() {
+  return (
+    process.env.VOTING_PROTOTYPE_ENABLED === "true" &&
+    Boolean(process.env.VOTING_SECRET && process.env.VOTING_SECRET.length >= 32)
+  );
+}
+
 export function isDatabaseConfigured() {
   const value = process.env.DATABASE_URL;
   if (!value || /PROJECT_REF|YOUR_|ENCODED_PASSWORD|aws-REGION/.test(value))
