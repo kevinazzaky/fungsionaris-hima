@@ -1,11 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthConfigured } from "@/lib/backend-config";
+import { contentSecurityPolicy } from "@/lib/security-headers";
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
-  response.headers.set("Cache-Control", "private, no-store");
-  if (!isAuthConfigured()) return response;
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
+  const policy = contentSecurityPolicy(nonce, process.env.NODE_ENV === "development", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", policy);
+  const nextResponse = () => {
+    requestHeaders.set("cookie", request.headers.get("cookie") || "");
+    const result = NextResponse.next({ request: { headers: requestHeaders } });
+    result.headers.set("Content-Security-Policy", policy);
+    result.headers.set("X-Content-Type-Options", "nosniff");
+    result.headers.set("X-Frame-Options", "DENY");
+    result.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    result.headers.set("Cache-Control", "private, no-store");
+    return result;
+  };
+  let response = nextResponse();
+  const authPath = /^\/(admin(?:\/|$)|api\/(admin|pendaftaran)(?:\/|$))/.test(request.nextUrl.pathname);
+  if (!authPath || !isAuthConfigured()) return response;
   const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -22,7 +38,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          response = NextResponse.next({ request });
+          response = nextResponse();
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
@@ -36,5 +52,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/pendaftaran/:path*"],
+  matcher: ["/((?!_next/|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff|woff2|pdf)$).*)"],
 };

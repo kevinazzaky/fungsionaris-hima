@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { serializeJsonForHtml } from "@/lib/security-headers";
 import { Figtree, Geist_Mono, Playfair_Display, Poppins, Rubik } from "next/font/google";
 import { SiteChrome } from "@/components/layout/site-chrome";
 import "./globals.css";
@@ -121,7 +123,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get("x-nonce") || undefined;
   return (
     <html
       lang="id"
@@ -129,9 +132,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <script
+          nonce={nonce}
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: serializeJsonForHtml({
               "@context": "https://schema.org",
               "@type": "Organization",
               name: "HIMA TI Undiknas",
