@@ -6,7 +6,7 @@ import { votingReady } from "@/data/voting";
 import { votingRepository } from "@/data/repositories/voting";
 import { normalizeNim, electionState } from "@/domain/voting";
 import { ValidationError } from "@/domain/admin";
-import { prepareVotingSession } from "@/use-cases/voting";
+import { loadVotingSubmissionStatus, prepareVotingSession } from "@/use-cases/voting";
 import { readVotingToken, voterKey } from "@/use-cases/voting-token";
 
 export function votingJson(data: unknown, status = 200) {
@@ -18,7 +18,7 @@ export function votingJson(data: unknown, status = 200) {
 
 export async function publicVotingRequest(
   request: Request,
-  action: "check" | "cast",
+  action: "check" | "cast" | "status",
 ) {
   try {
     assertSameOrigin(request);
@@ -39,7 +39,7 @@ export async function publicVotingRequest(
       !(await votingRepository.rate(
         bucket,
         action,
-        action === "check" ? 30 : 20,
+        action === "status" ? 60 : 50,
       ))
     )
       return votingJson(
@@ -72,6 +72,11 @@ export async function publicVotingRequest(
       );
     }
     const token = readVotingToken(input.token, secret);
+    if (action === "status") {
+      if (!(await votingRepository.rate(`status:${token.electionId}:${token.voterKey}`, "status", 10)))
+        return votingJson({ error: "Terlalu banyak pemeriksaan status. Coba kembali nanti." }, 429);
+      return votingJson(await loadVotingSubmissionStatus(votingRepository, input.token, secret));
+    }
     if (typeof input.candidateId !== "string")
       throw new ValidationError("Kandidat tidak valid.");
     assertUuid(input.candidateId);

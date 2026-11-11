@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "@/components/ui/navigation-link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { VotingCandidateCard } from "./voting-candidate-card";
 import { VotingDialog } from "./voting-dialog";
 import { PendingLabel } from "@/components/ui/pending-label";
+import { checkVotingSubmission, submitVotingChoice, type SubmissionStatus } from "@/lib/voting-submission";
 import {
   electionState,
   votingStateLabels,
@@ -34,6 +35,7 @@ async function send(path: string, payload: object) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Permintaan gagal. Silakan coba kembali.");
@@ -50,6 +52,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
   const inFlight = useRef(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [submission, setSubmission] = useState<SubmissionStatus | "idle" | "verifying">("idle");
   const successHeading = useRef<HTMLHeadingElement>(null);
   const candidateHeading = useRef<HTMLHeadingElement>(null);
   const candidateGrid = useRef<HTMLDivElement>(null);
@@ -78,6 +81,36 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
     });
   }, [token]);
 
+  const finishSubmission = useCallback(() => {
+    setSuccess(true);
+    setToken("");
+    setSelection(null);
+    setProfile(null);
+    setNim("");
+  }, []);
+  const applySubmissionStatus = useCallback((result: SubmissionStatus) => {
+    setSubmission(result);
+    if (result === "recorded") finishSubmission();
+  }, [finishSubmission]);
+  const verifySubmission = useCallback(async () => {
+    if (inFlight.current || !token) return;
+    inFlight.current = true;
+    setBusy(true);
+    setSubmission("verifying");
+    setError("");
+    try {
+      applySubmissionStatus(await checkVotingSubmission(send, token));
+    } finally {
+      setBusy(false);
+      inFlight.current = false;
+    }
+  }, [token, applySubmissionStatus]);
+  useEffect(() => {
+    if (submission !== "unknown") return;
+    const checkWhenOnline = () => { void verifySubmission(); };
+    window.addEventListener("online", checkWhenOnline);
+    return () => window.removeEventListener("online", checkWhenOnline);
+  }, [submission, verifySubmission]);
   async function checkNim(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current) return;
@@ -97,19 +130,24 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
   }
   async function submitVote(event: React.FormEvent) {
     event.preventDefault();
-    if (inFlight.current || !selection) return;
+    if (inFlight.current || !selection || submission === "unknown" || submission === "verifying") return;
     inFlight.current = true;
     setBusy(true);
     setError("");
     try {
-      await send("/api/voting/ballots", { token, candidateId: selection.id });
-      setSuccess(true);
-      setToken("");
-      setSelection(null);
-      setProfile(null);
-      setNim("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Permintaan gagal.");
+      const result = await submitVotingChoice(async (path, payload) => {
+        try {
+          return await send(path, payload);
+        } catch (error) {
+          if (path.endsWith("/ballots") && error instanceof Error && error.name === "Error")
+            setError(error.message);
+          throw error;
+        }
+      }, {
+        token,
+        candidateId: selection.id,
+      }, () => setSubmission("verifying"));
+      applySubmissionStatus(result);
     } finally {
       setBusy(false);
       inFlight.current = false;
@@ -347,7 +385,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
       {selection && (
         <VotingDialog
           title="Konfirmasi pilihan"
-          busy={busy}
+          busy={busy || submission !== "idle"}
           onClose={() => {
             setSelection(null);
             setError("");
@@ -372,11 +410,23 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                 {error}
               </p>
             )}
+            {submission === "verifying" && (
+              <p role="status"><PendingLabel pending text="Koneksi terganggu. Memeriksa status suara…" /></p>
+            )}
+            {submission === "unknown" && (
+              <p className="voting-error" role="status">
+                Status suara belum dapat dipastikan. Periksa status saat koneksi tersedia; jangan mengirim suara ulang dulu.
+                Jika sesi sudah berakhir, masukkan NIM kembali atau hubungi panitia.
+              </p>
+            )}
+            {submission === "not_recorded" && (
+              <p role="status">Suara belum terdeteksi. Pengiriman sebelumnya mungkin masih diproses. Periksa lagi atau kirim ulang pilihan yang sama; sistem hanya mencatat satu suara.</p>
+            )}
             <div className="voting-card-actions">
               <button
                 className="voting-secondary"
                 type="button"
-                disabled={busy}
+                disabled={busy || submission !== "idle"}
                 onClick={() => {
                   setSelection(null);
                   setError("");
@@ -384,12 +434,14 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
               >
                 Kembali memilih
               </button>
+              {submission !== "idle" && <button className="voting-secondary" type="button" disabled={busy} onClick={() => void verifySubmission()}>Periksa status suara</button>}
+              {submission === "unknown" && !busy && <a className="voting-secondary" href="/voting">Periksa dengan NIM kembali</a>}
               <button
                 className="voting-primary"
                 type="submit"
-                disabled={busy || !canVote}
+                disabled={busy || !canVote || submission === "unknown" || submission === "verifying"}
               >
-                <PendingLabel pending={busy} text="Mengirim suara…">Kirim suara saya</PendingLabel>
+                <PendingLabel pending={busy} text={submission === "verifying" ? "Memeriksa status…" : "Mengirim suara…"}>{submission === "not_recorded" ? "Kirim ulang pilihan yang sama" : "Kirim suara saya"}</PendingLabel>
               </button>
             </div>
           </form>

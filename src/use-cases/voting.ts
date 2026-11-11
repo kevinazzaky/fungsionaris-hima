@@ -1,6 +1,18 @@
 import { normalizeNim } from "../domain/voting";
 import { ValidationError } from "../domain/admin";
-import { issueVotingToken, voterKey } from "./voting-token";
+import { issueVotingToken, readVotingToken, voterKey } from "./voting-token";
+
+export async function loadVotingSubmissionStatus(
+  repository: { voterEligibility: (id: string, key: string) => Promise<{ consumed: boolean } | null> },
+  token: unknown,
+  secret: string,
+  now = Date.now(),
+) {
+  const session = readVotingToken(token, secret, now);
+  const voter = await repository.voterEligibility(session.electionId, session.voterKey);
+  if (!voter) throw new ValidationError("Status suara belum dapat dipastikan. Hubungi panitia.");
+  return { status: voter.consumed ? "recorded" as const : "not_recorded" as const };
+}
 
 export async function loadAdminVotingResults<T>(
   status: string,
