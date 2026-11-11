@@ -92,6 +92,7 @@ export function Footer() {
                 </a>
               </li>
             ))}
+            <li><Link href="/voting" className="inline-flex min-h-11 items-center transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">Pemilihan Ketua</Link></li>
           </ul>
         </div>
 

@@ -1,5 +1,6 @@
 import { Hero } from "@/components/home/hero";
 import { AboutSection } from "@/components/home/about-section";
+import { VotingSection } from "@/components/home/voting-section";
 import { ProgramKerjaSection } from "@/components/home/program-kerja-section";
 import { FungsionarisSection } from "@/components/home/fungsionaris-section";
 import { PendaftaranSection } from "@/components/home/pendaftaran-section";
@@ -23,6 +24,7 @@ export default async function Home() {
       <SectionScroller />
       <Hero images={content.hero} />
       <AboutSection />
+      <VotingSection />
       <FungsionarisSection />
       <ProgramKerjaSection programs={programs} />
       <GallerySection />
