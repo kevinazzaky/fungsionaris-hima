@@ -21,6 +21,17 @@ test("kelonggaran eval dan websocket hanya aktif di development", () => {
   assert.doesNotMatch(contentSecurityPolicy("prod", false), /unsafe-eval|ws:/);
 });
 
+test("HTTP loopback tidak dipaksa ke HTTPS tetapi domain publik tetap di-upgrade", () => {
+  for (const host of ["127.0.0.1", "localhost", "[::1]"]) {
+    const local = contentSecurityPolicy("local", false, undefined, `http://${host}:3003/voting`);
+    assert.doesNotMatch(local, /upgrade-insecure-requests|unsafe-eval/);
+    assert.match(local, /'nonce-local'/);
+    assert.match(local, /script-src-attr 'none'/);
+  }
+  for (const url of ["https://example.com/voting", "http://example.com/voting", "http://localhost.example.com/voting"])
+    assert.match(contentSecurityPolicy("public", false, undefined, url), /upgrade-insecure-requests/);
+});
+
 test("JSON terstruktur tidak dapat menutup tag script dan nilainya tetap sama", () => {
   const payload = { name: '</script><script>alert("x")</script>', description: "Teks < biasa" };
   const result = serializeJsonForHtml(payload);

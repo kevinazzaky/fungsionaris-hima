@@ -1,5 +1,7 @@
-export function contentSecurityPolicy(nonce: string, development: boolean, supabaseUrl?: string) {
+export function contentSecurityPolicy(nonce: string, development: boolean, supabaseUrl?: string, requestUrl?: string) {
   const storage = supabaseUrl ? new URL(supabaseUrl).origin : "";
+  const request = requestUrl ? new URL(requestUrl) : undefined;
+  const localHttp = request?.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(request.hostname);
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
@@ -12,7 +14,7 @@ export function contentSecurityPolicy(nonce: string, development: boolean, supab
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(development ? [] : ["upgrade-insecure-requests"]),
+    ...(development || localHttp ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
 
