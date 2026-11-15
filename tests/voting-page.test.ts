@@ -43,6 +43,10 @@ test("halaman awal menampilkan form NIM tanpa kartu kandidat sebelum sesi diteri
     }),
   );
   assert.match(html, /id="voting-nim"/);
+  assert.match(html, /<label for="voting-name">Nama lengkap<\/label>/);
+  assert.match(html, /<input[^>]*id="voting-name"[^>]*required=""/);
+  assert.match(html, /pattern="\[\\p\{L\}\]\[\\p\{L\}\\p\{M\} .\]\*"/);
+  assert.match(html, /<form[^>]*method="post"/);
   assert.match(html, /inputMode="numeric"/);
   assert.doesNotMatch(html, /Kandidat Uji|id="kandidat"|Konfirmasi pilihan/);
 });

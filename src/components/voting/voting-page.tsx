@@ -5,10 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { VotingCandidateCard } from "./voting-candidate-card";
 import { VotingDialog } from "./voting-dialog";
+import { VotingSubmissionFeedback } from "./voting-submission-feedback";
 import { PendingLabel } from "@/components/ui/pending-label";
-import { checkVotingSubmission, submitVotingChoice, type SubmissionStatus } from "@/lib/voting-submission";
+import { checkVotingSubmission, submitVotingChoice, VotingRequestError, type SubmissionStatus } from "@/lib/voting-submission";
+import { fetchVotingUpdate } from "@/lib/voting-updates";
 import {
   electionState,
+  normalizeVoterName,
   votingStateLabels,
   type VotingCandidate,
   type VotingPublicData,
@@ -35,16 +38,19 @@ async function send(path: string, payload: object) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(path.endsWith("/status") ? 5_000 : 15_000),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Permintaan gagal. Silakan coba kembali.");
+  if (!response.ok) throw new VotingRequestError(result.error || "Permintaan gagal. Silakan coba kembali.", response.status);
   return result;
 }
 
-export function VotingPage({ data }: { data: VotingPublicData }) {
+export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
+  const [liveData, setLiveData] = useState<VotingPublicData | null>(null);
+  const data = liveData || initialData;
   const [now, setNow] = useState(() => new Date());
   const [nim, setNim] = useState("");
+  const [name, setName] = useState("");
   const [token, setToken] = useState("");
   const [profile, setProfile] = useState<VotingCandidate | null>(null);
   const [selection, setSelection] = useState<VotingCandidate | null>(null);
@@ -58,12 +64,39 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
   const candidateGrid = useRef<HTMLDivElement>(null);
   const status = data.election ? electionState(data.election, now) : "draft";
   const canVote = data.available && status === "open";
+  const electionId = data.election?.id;
   const candidates =
     data.election?.candidates.filter((c) => !c.placeholder) || [];
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    let stopped = false, pending = false;
+    async function refresh() {
+      if (stopped || pending || document.hidden || inFlight.current) return;
+      pending = true;
+      try {
+        const update = await fetchVotingUpdate();
+        if (!stopped && update && (!token || update.election?.id === electionId))
+          setLiveData(update);
+      } finally {
+        pending = false;
+      }
+    }
+    void refresh();
+    const timer = setInterval(() => void refresh(), 5_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [token, electionId]);
   useEffect(() => {
     if (!success) return;
     successHeading.current?.focus();
@@ -87,6 +120,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
     setSelection(null);
     setProfile(null);
     setNim("");
+    setName("");
   }, []);
   const applySubmissionStatus = useCallback((result: SubmissionStatus) => {
     setSubmission(result);
@@ -118,9 +152,10 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
     setBusy(true);
     setError("");
     try {
-      const result = await send("/api/voting/check", { nim });
+      const result = await send("/api/voting/check", { nim, name: normalizeVoterName(name) });
       setToken(result.token);
       setNim("");
+      setName("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Permintaan gagal.");
     } finally {
@@ -130,7 +165,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
   }
   async function submitVote(event: React.FormEvent) {
     event.preventDefault();
-    if (inFlight.current || !selection || submission === "unknown" || submission === "verifying") return;
+    if (inFlight.current || !selection || submission === "unknown" || submission === "verifying" || submission === "expired") return;
     inFlight.current = true;
     setBusy(true);
     setError("");
@@ -178,7 +213,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
         <section className="voting-success" aria-live="polite">
           <p className="voting-kicker">HIMA TI UNDIKNAS</p>
           <h1 ref={successHeading} tabIndex={-1}>
-            Terima kasih sudah berpartisipasi.
+            Terima kasih sudah berpartisipasi
           </h1>
           <p>
             Surat suara berhasil disimpan. Hak pilih untuk periode ini sudah
@@ -206,11 +241,11 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                   PEMILIHAN KETUA · {data.election?.period || "HIMA TI"}
                 </p>
                 <h1>
-                  Suaramu untuk <span>HIMA TI berikutnya.</span>
+                  Suaramu menentukan <span>arah HIMA TI</span>
                 </h1>
                 <p className="voting-intro">
-                  Kenali gagasannya. Tentukan pilihanmu. Ambil bagian dalam
-                  pemilihan Ketua HIMA TI Undiknas.
+                  Kenali para kandidat, pelajari gagasannya, dan pilih Ketua
+                  HIMA TI Undiknas berikutnya.
                 </p>
               </div>
               <section
@@ -229,15 +264,15 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                     <>
                       <h2>
                         {status === "ended" || status === "closed"
-                          ? "Terima kasih atas partisipasimu."
-                          : "Suaramu segera mendapat giliran."}
+                          ? "Terima kasih atas partisipasimu"
+                          : "Suaramu segera mendapat giliran"}
                       </h2>
                       <p className="voting-panel-description">
                         {status === "ended" || status === "closed"
                           ? "Pemungutan suara periode ini sudah berakhir. Informasi selanjutnya akan disampaikan oleh panitia HIMA TI."
                           : status === "upcoming"
                             ? `Pemungutan suara dimulai ${schedule(data.election?.startsAt)}.`
-                            : "Panitia sedang menyiapkan profil kandidat, NIM terdaftar, dan jadwal pemilihan."}
+                            : "Pemilihan akan segera dibuka. Nantikan jadwal dan informasi selanjutnya."}
                       </p>
                       {!data.available && (
                         <p>
@@ -253,12 +288,28 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                       </Link>
                     </>
                   ) : (
-                    <form onSubmit={checkNim} aria-busy={busy}>
-                      <h2>Mulai dari NIM kamu.</h2>
+                    <form method="post" onSubmit={checkNim} aria-busy={busy}>
+                      <h2>Mulai dari nama dan NIM</h2>
                       <p className="voting-panel-description">
-                        Masukkan NIM yang terdaftar untuk melihat kandidat dan
-                        menggunakan hak pilihmu.
+                        Masukkan nama lengkap dan NIM sesuai daftar pemilih.
                       </p>
+                      <label htmlFor="voting-name">Nama lengkap</label>
+                      <input
+                        id="voting-name"
+                        name="name"
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        minLength={2}
+                        maxLength={100}
+                        pattern={"[\\p{L}][\\p{L}\\p{M} .]*"}
+                        autoComplete="name"
+                        placeholder="Nama lengkap sesuai daftar pemilih"
+                        aria-describedby="voting-name-help"
+                        required
+                        disabled={busy}
+                      />
+                      <p id="voting-name-help">Hanya huruf, spasi, dan titik, 2–100 karakter.</p>
                       <label htmlFor="voting-nim">Nomor Induk Mahasiswa</label>
                       <input
                         id="voting-nim"
@@ -285,7 +336,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                         type="submit"
                         disabled={busy}
                       >
-                        <PendingLabel pending={busy} text="Memeriksa NIM…">Periksa NIM dan lihat kandidat</PendingLabel>
+                        <PendingLabel pending={busy} text="Memeriksa data…">Periksa data dan lihat kandidat</PendingLabel>
                       </button>
                     </form>
                   )}
@@ -334,7 +385,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                   setError("");
                 }}
               >
-                Ganti NIM
+                  Ubah data diri
               </button>
             </div>
             <div className="voting-section-heading">
@@ -347,7 +398,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                   ref={candidateHeading}
                   tabIndex={-1}
                 >
-                  Tentukan pilihanmu.
+                  Tentukan pilihanmu
                 </h1>
                 <p>
                   Baca visi, misi, dan program kerja sebelum memilih. Satu suara
@@ -391,7 +442,7 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
             setError("");
           }}
         >
-          <form onSubmit={submitVote} aria-busy={busy}>
+          <form method="post" onSubmit={submitVote} aria-busy={busy}>
             <p>
               Anda memilih kandidat nomor <strong>{selection.number}</strong>.
             </p>
@@ -405,45 +456,17 @@ export function VotingPage({ data }: { data: VotingPublicData }) {
                 Pemungutan suara telah berakhir. Pengiriman dinonaktifkan.
               </p>
             )}
-            {error && (
-              <p className="voting-error" role="alert">
-                {error}
-              </p>
-            )}
-            {submission === "verifying" && (
-              <p role="status"><PendingLabel pending text="Koneksi terganggu. Memeriksa status suara…" /></p>
-            )}
-            {submission === "unknown" && (
-              <p className="voting-error" role="status">
-                Status suara belum dapat dipastikan. Periksa status saat koneksi tersedia; jangan mengirim suara ulang dulu.
-                Jika sesi sudah berakhir, masukkan NIM kembali atau hubungi panitia.
-              </p>
-            )}
-            {submission === "not_recorded" && (
-              <p role="status">Suara belum terdeteksi. Pengiriman sebelumnya mungkin masih diproses. Periksa lagi atau kirim ulang pilihan yang sama; sistem hanya mencatat satu suara.</p>
-            )}
-            <div className="voting-card-actions">
-              <button
-                className="voting-secondary"
-                type="button"
-                disabled={busy || submission !== "idle"}
-                onClick={() => {
-                  setSelection(null);
-                  setError("");
-                }}
-              >
-                Kembali memilih
-              </button>
-              {submission !== "idle" && <button className="voting-secondary" type="button" disabled={busy} onClick={() => void verifySubmission()}>Periksa status suara</button>}
-              {submission === "unknown" && !busy && <a className="voting-secondary" href="/voting">Periksa dengan NIM kembali</a>}
-              <button
-                className="voting-primary"
-                type="submit"
-                disabled={busy || !canVote || submission === "unknown" || submission === "verifying"}
-              >
-                <PendingLabel pending={busy} text={submission === "verifying" ? "Memeriksa status…" : "Mengirim suara…"}>{submission === "not_recorded" ? "Kirim ulang pilihan yang sama" : "Kirim suara saya"}</PendingLabel>
-              </button>
-            </div>
+            <VotingSubmissionFeedback
+              submission={submission}
+              busy={busy}
+              canVote={canVote}
+              error={error}
+              onBack={() => {
+                setSelection(null);
+                setError("");
+              }}
+              onVerify={() => void verifySubmission()}
+            />
           </form>
         </VotingDialog>
       )}

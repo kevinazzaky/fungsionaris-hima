@@ -18,7 +18,7 @@ export function VotingSection() {
           >
             Pemilihan Ketua
             <br />
-            <span className="text-amber-400">HIMA TI Undiknas.</span>
+            <span className="text-amber-400">HIMA TI Undiknas</span>
           </h2>
           <p className="mt-5 max-w-lg text-sm leading-relaxed text-zinc-300 sm:text-base">
             Pelajari visi, misi, dan program kerja para calon ketua. Gunakan
@@ -31,7 +31,7 @@ export function VotingSection() {
           </p>
           <p className="mt-3 text-sm leading-relaxed text-zinc-300">
             Hak pemberian suara diberikan kepada mahasiswa Teknologi Informasi
-            angkatan 2024, 2025, dan 2026.
+            angkatan 2023, 2024, 2025, dan 2026.
           </p>
           <Link
             href="/voting"

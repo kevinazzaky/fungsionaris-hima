@@ -1005,6 +1005,9 @@ body:has(.admin dialog[open]) {
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
+.admin-dialog-header h2[tabindex="-1"]:focus {
+  outline: none;
+}
 .admin-login {
   width: min(100%, 540px);
   margin-inline: auto;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkVotingSubmission, submitVotingChoice } from "../src/lib/voting-submission";
+import { checkVotingSubmission, submitVotingChoice, VotingRequestError } from "../src/lib/voting-submission";
 import { loadVotingSubmissionStatus } from "../src/use-cases/voting";
 import { issueVotingToken } from "../src/use-cases/voting-token";
 
@@ -18,9 +18,49 @@ test("respons kirim hilang: hanya memeriksa status, tidak mengirim suara ulang",
 });
 
 test("server tidak terjangkau atau respons tidak dikenal tidak dianggap sukses/gagal pasti", async () => {
-  assert.equal(await checkVotingSubmission(async () => { throw new Error("offline"); }, "session"), "unknown");
-  assert.equal(await checkVotingSubmission(async () => ({ success: true }), "session"), "unknown");
-  assert.equal(await checkVotingSubmission(async () => ({ status: "not_recorded" }), "session"), "not_recorded");
+  const wait=async()=>{};
+  assert.equal(await checkVotingSubmission(async () => { throw new Error("offline"); }, "session",wait), "unknown");
+  assert.equal(await checkVotingSubmission(async () => ({ success: true }), "session",wait), "unknown");
+  assert.equal(await checkVotingSubmission(async () => ({ status: "not_recorded" }), "session",wait), "not_recorded");
+});
+
+test("pemeriksaan latar menunggu transaksi terlambat dan tidak mengirim ballot kedua", async () => {
+  const paths:string[]=[],delays:number[]=[];
+  let checks=0;
+  const result=await submitVotingChoice(async(path)=>{
+    paths.push(path);
+    if(path.endsWith("ballots"))throw new TypeError("response lost");
+    checks++;
+    if(checks===1)return {status:"not_recorded"};
+    if(checks===2)throw new TypeError("temporarily offline");
+    return {status:"recorded"};
+  },{token:"session",candidateId:"candidate"},()=>{},async ms=>{delays.push(ms);});
+  assert.equal(result,"recorded");
+  assert.equal(paths.filter(path=>path.endsWith("ballots")).length,1);
+  assert.equal(checks,3);
+  assert.deepEqual(delays,[1000,2000]);
+});
+
+test("pemeriksaan otomatis berhenti setelah tiga percobaan dan tidak menganggap jaringan putus sebagai suara gagal", async () => {
+  for(const replies of [["not_recorded","not_recorded","not_recorded"],["not_recorded","unknown","unknown"]]){
+    let checks=0;
+    const result=await checkVotingSubmission(async()=>{
+      const status=replies[checks++];
+      if(status==="unknown")throw new TypeError("offline");
+      return {status};
+    },"session",async()=>{});
+    assert.equal(checks,3);
+    assert.equal(result,replies[2]);
+  }
+});
+
+test("sesi habis dan rate limit tidak dipoll berulang", async () => {
+  for(const status of [400,429]){
+    let checks=0;
+    const result=await checkVotingSubmission(async()=>{checks++;throw new VotingRequestError("rejected",status);},"session",async()=>assert.fail("tidak perlu retry"));
+    assert.equal(checks,1);
+    assert.equal(result,status===400?"expired":"unknown");
+  }
 });
 
 test("respons sukses tidak memerlukan pemeriksaan tambahan", async () => {
