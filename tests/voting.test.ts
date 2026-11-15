@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   normalizeNim,
+  normalizeVoterName,
   parseVoterCsv,
   electionState,
   validateCandidate,
@@ -13,6 +14,15 @@ import {
   issueVotingToken,
   readVotingToken,
 } from "../src/use-cases/voting-token";
+
+test("nama pemilih menerima huruf Unicode, spasi dan titik dengan panjang terbatas", () => {
+  assert.equal(normalizeVoterName("  I Made   Dandi  "), "I Made Dandi");
+  assert.equal(normalizeVoterName("José"), "José");
+  assert.equal(normalizeVoterName("A.A Ngurah Agung"), "A.A Ngurah Agung");
+  assert.equal(normalizeVoterName("Cipriana dos Reis de .A.Soares"), "Cipriana dos Reis de .A.Soares");
+  for (const value of [null, 123, "", "  ", "..", "A", "A".repeat(101), "Bayu123", "<script>alert(1)</script>", "Robert'); DROP TABLE voters;--", "Bayu\nTrias", "Bayu😀", "Bayu\u200bTrias"])
+    assert.throws(() => normalizeVoterName(value));
+});
 
 test("NIM tetap string, mempertahankan nol awal dan menolak input ambigu", () => {
   assert.equal(normalizeNim(" 00123456 "), "00123456");
@@ -31,6 +41,12 @@ test("CSV DPT memeriksa periode, prodi, mahasiswa aktif dan duplikat tanpa konve
   assert.throws(() =>
     parseVoterCsv('nim,prodi,aktif,periode\n"broken', "2026/2027"),
   );
+});
+
+test("CSV nama dan NIM dipasangkan tanpa mengubah nol depan", () => {
+  const result = parseVoterCsv("nim,nama,prodi,aktif,periode\n00123456,I Made Dandi,TI,true,2026/2027\n00123457,Bayu123,TI,true,2026/2027", "2026/2027");
+  assert.deepEqual(result.voters, [{ nim: "00123456", name: "I Made Dandi" }]);
+  assert.equal(result.issues.length, 1);
 });
 
 test("batas waktu voting memakai awal inklusif dan akhir eksklusif", () => {

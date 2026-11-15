@@ -89,6 +89,7 @@ export const votingRepository = {
           logs: [],
           health: [],
           limits: [],
+          voters: [],
         };
       await tx.$queryRaw`SELECT id FROM elections WHERE id=${selectedId}::uuid FOR SHARE`;
       const e = await tx.election.findUnique({
@@ -134,6 +135,11 @@ export const votingRepository = {
           participation: total ? Math.round((ballots / total) * 1000) / 10 : 0,
         },
         results,
+        voters: await tx.eligibleVoter.findMany({
+          where: { electionId: e.id, name: { not: null } },
+          select: { voterKey: true, name: true, consumed: true },
+          orderBy: { name: "asc" },
+        }),
         logs: logs.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() })),
         health: health.map((h) => ({
           ...h,
@@ -148,15 +154,19 @@ export const votingRepository = {
     if (!e) throw new ValidationError("Pemilihan tidak ditemukan.");
     return e.period;
   },
-  async importVoters(id: string, keys: string[], actorId: string) {
+  async importVoters(id: string, voters: { voterKey: string; name: string | null }[], actorId: string) {
     return getPrisma().$transaction(async (tx) => {
       await lockDraft(tx, id);
-      const result = await tx.eligibleVoter.createMany({
-        data: keys.map((voterKey) => ({ electionId: id, voterKey })),
-        skipDuplicates: true,
-      });
-      await audit(tx, id, actorId, `dpt_imported:${result.count}`);
-      return result.count;
+      await tx.$executeRaw`
+        INSERT INTO eligible_voters (election_id, voter_key, name)
+        SELECT ${id}::uuid, entry."voterKey", entry.name
+        FROM jsonb_to_recordset(${JSON.stringify(voters)}::jsonb)
+          AS entry("voterKey" text, name text)
+        ON CONFLICT (election_id, voter_key) DO UPDATE
+        SET name = COALESCE(EXCLUDED.name, eligible_voters.name)
+      `;
+      await audit(tx, id, actorId, `dpt_imported:${voters.length}`);
+      return voters.length;
     });
   },
   async saveCandidate(
@@ -221,6 +231,8 @@ export const votingRepository = {
         }))
       )
         throw new ValidationError("Tambahkan NIM terdaftar sebelum mengonfirmasi jadwal.");
+      if (await tx.eligibleVoter.count({ where: { electionId: id, eligible: true, name: null } }))
+        throw new ValidationError("Lengkapi nama semua pemilih sebelum mengonfirmasi jadwal.");
       const [{ now }] = await tx.$queryRaw<
         { now: Date }[]
       >`SELECT clock_timestamp() AS now`;
@@ -256,7 +268,7 @@ export const votingRepository = {
   async voterEligibility(electionId: string, key: string) {
     return getPrisma().eligibleVoter.findUnique({
       where: { electionId_voterKey: { electionId, voterKey: key } },
-      select: { eligible: true, consumed: true },
+      select: { eligible: true, consumed: true, name: true },
     });
   },
   async cast(electionId: string, key: string, candidateId: string) {
@@ -265,10 +277,10 @@ export const votingRepository = {
     >`SELECT cast_hima_ballot(${electionId}::uuid,${key},${candidateId}::uuid) AS accepted`;
     return result[0].accepted;
   },
-  async rate(key: string, scope: string, limit: number) {
+  async rate(key: string, scope: string, limit: number, windowSeconds = 600) {
     const result = await getPrisma().$queryRaw<
       { allowed: boolean }[]
-    >`SELECT voting_take_rate(${key},${scope},${limit}::integer) AS allowed`;
+    >`SELECT voting_take_rate(${key},${scope},${limit}::integer,${windowSeconds}::integer) AS allowed`;
     return result[0].allowed;
   },
   async health(

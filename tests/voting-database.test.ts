@@ -15,6 +15,7 @@ test("surat suara atomik, rahasia, periode terkunci dan akses database ditolak",
       ),
     );
     const election = randomUUID();
+    await db.exec(await readFile("prisma/migrations/20261115000000_voter_names/migration.sql", "utf8"));
     const candidate = randomUUID();
     await db.query("INSERT INTO elections(id,period) VALUES ($1,'2026/2027')", [
       election,
@@ -53,6 +54,7 @@ test("surat suara atomik, rahasia, periode terkunci dan akses database ditolak",
     await db.query(
       "UPDATE eligible_voters SET eligible=false WHERE voter_key='inactive'",
     );
+    await db.query("UPDATE eligible_voters SET name='Pemilih Uji' WHERE voter_key='eligible'");
     const cast = (key: string, id = candidate) =>
       db.query<{ accepted: boolean }>(
         "SELECT cast_hima_ballot($1,$2,$3) AS accepted",
@@ -67,6 +69,7 @@ test("surat suara atomik, rahasia, periode terkunci dan akses database ditolak",
       (await cast("eligible", emptyCandidate)).rows[0].accepted,
       false,
     );
+    await assert.rejects(db.query("UPDATE eligible_voters SET name='Nama Lain',consumed=true WHERE voter_key='eligible'"), /locked/);
     const otherElection = randomUUID(),
       otherCandidate = randomUUID();
     await db.query("INSERT INTO elections(id,period) VALUES ($1,'2027/2028')", [
@@ -101,6 +104,7 @@ test("surat suara atomik, rahasia, periode terkunci dan akses database ditolak",
     assert.equal(concurrent.filter((r) => r.rows[0].accepted).length, 1);
     assert.equal((await cast("eligible")).rows[0].accepted, false);
     assert.equal((await db.query("SELECT * FROM ballots")).rows.length, 1);
+    assert.equal((await db.query<{name:string}>("SELECT name FROM eligible_voters WHERE voter_key='eligible'")).rows[0].name, "Pemilih Uji");
     await db.exec(
       "CREATE FUNCTION fail_ballot() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'database failure'; END $$; CREATE TRIGGER test_failure BEFORE INSERT ON ballots FOR EACH ROW EXECUTE FUNCTION fail_ballot();",
     );

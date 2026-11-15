@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       return votingJson({
         imported: await votingRepository.importVoters(
           id,
-          preview.nims.map((nim) => voterKey(nim, id, secret)),
+          preview.voters.map(({ nim, name }) => ({ voterKey: voterKey(nim, id, secret), name })),
           admin.id,
         ),
       });

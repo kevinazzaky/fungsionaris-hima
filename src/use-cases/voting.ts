@@ -1,6 +1,8 @@
-import { normalizeNim } from "../domain/voting";
+import { normalizeNim, normalizeVoterName } from "../domain/voting";
 import { ValidationError } from "../domain/admin";
 import { issueVotingToken, readVotingToken, voterKey } from "./voting-token";
+
+export class VotingCheckLimitError extends ValidationError {}
 
 export async function loadVotingSubmissionStatus(
   repository: { voterEligibility: (id: string, key: string) => Promise<{ consumed: boolean } | null> },
@@ -26,22 +28,31 @@ export async function prepareVotingSession(
     voterEligibility: (id: string, key: string) => Promise<{
       eligible: boolean;
       consumed: boolean;
+      name: string | null;
     } | null>;
   },
   nim: unknown,
   electionId: string,
   secret: string,
+  name: unknown,
   now = Date.now(),
+  checkAllowed = true,
 ) {
+  const enteredName = normalizeVoterName(name);
   const key = voterKey(normalizeNim(nim), electionId, secret);
   const voter = await repository.voterEligibility(electionId, key);
+  const nameMatches = !!voter?.name && normalizeVoterName(voter.name).toLocaleLowerCase("id-ID") === enteredName.toLocaleLowerCase("id-ID");
+  if (!checkAllowed && !(nameMatches && voter?.consumed))
+    throw new VotingCheckLimitError("Terlalu banyak percobaan. Tunggu 10 menit, lalu coba lagi.");
   if (!voter)
     throw new ValidationError(
-      "NIM belum terdaftar untuk pemilihan ini. Periksa NIM atau hubungi panitia.",
+      "Nama dan NIM tidak cocok. Periksa kembali.",
     );
+  if (!nameMatches)
+    throw new ValidationError("Nama dan NIM tidak cocok. Periksa kembali.");
   if (voter.consumed)
     throw new ValidationError(
-      "NIM ini sudah digunakan untuk memilih. Kamu tidak dapat memilih lagi pada periode ini.",
+      "Nama dan NIM ini sudah digunakan untuk memilih pada periode ini.",
     );
   if (!voter.eligible)
     throw new ValidationError(

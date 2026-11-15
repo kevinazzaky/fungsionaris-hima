@@ -41,6 +41,16 @@ export function normalizeNim(value: unknown) {
   return nim;
 }
 
+export function normalizeVoterName(value: unknown) {
+  if (typeof value !== "string" || value.length > 100 ||
+      !/^\p{L}[\p{L}\p{M} .]*$/u.test(value.trim()))
+    throw new ValidationError("Nama hanya boleh berisi huruf, spasi, dan titik, 2–100 karakter.");
+  const name = value.trim().normalize("NFC").replace(/ +/g, " ");
+  if (name.length < 2)
+    throw new ValidationError("Nama hanya boleh berisi huruf, spasi, dan titik, 2–100 karakter.");
+  return name;
+}
+
 export function electionState(
   e: Pick<VotingElection, "status" | "startsAt" | "endsAt">,
   now = new Date(),
@@ -180,19 +190,23 @@ export function parseVoterCsv(csv: string, period: string) {
   )
     throw new ValidationError("CSV maksimal 500 KB.");
   const [headers, ...rows] = csvRows(csv);
-  if (!headers || headers.join(",") !== "nim,prodi,aktif,periode")
-    throw new ValidationError("Header CSV harus nim,prodi,aktif,periode.");
+  const withNames = headers?.join(",") === "nim,nama,prodi,aktif,periode";
+  if (!headers || (!withNames && headers.join(",") !== "nim,prodi,aktif,periode"))
+    throw new ValidationError("Header CSV harus nim,nama,prodi,aktif,periode.");
   if (!rows.length || rows.length > 5000)
     throw new ValidationError("Isi 1–5000 baris per impor.");
   const nims: string[] = [],
     seen = new Set<string>(),
     issues: { row: number; message: string }[] = [];
+  const voters: { nim: string; name: string | null }[] = [];
   rows.forEach((r, index) => {
     try {
-      if (r.length !== 4)
+      if (r.length !== (withNames ? 5 : 4))
         throw new ValidationError("Jumlah kolom tidak sesuai.");
       const nim = normalizeNim(r[0]);
-      if (r[1] !== "TI" || r[2] !== "true" || r[3] !== period)
+      const name = withNames ? normalizeVoterName(r[1]) : null;
+      const offset = withNames ? 1 : 0;
+      if (r[1 + offset] !== "TI" || r[2 + offset] !== "true" || r[3 + offset] !== period)
         throw new ValidationError(
           "Wajib mahasiswa aktif TI pada periode yang dipilih.",
         );
@@ -200,6 +214,7 @@ export function parseVoterCsv(csv: string, period: string) {
         throw new ValidationError("NIM duplikat dalam berkas.");
       seen.add(nim);
       nims.push(nim);
+      voters.push({ nim, name });
     } catch (e) {
       issues.push({
         row: index + 2,
@@ -208,5 +223,5 @@ export function parseVoterCsv(csv: string, period: string) {
       });
     }
   });
-  return { total: rows.length, nims, issues };
+  return { total: rows.length, nims, voters, issues };
 }

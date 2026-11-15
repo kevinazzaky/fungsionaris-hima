@@ -6,7 +6,7 @@ import { votingReady } from "@/data/voting";
 import { votingRepository } from "@/data/repositories/voting";
 import { normalizeNim, electionState } from "@/domain/voting";
 import { ValidationError } from "@/domain/admin";
-import { loadVotingSubmissionStatus, prepareVotingSession } from "@/use-cases/voting";
+import { loadVotingSubmissionStatus, prepareVotingSession, VotingCheckLimitError } from "@/use-cases/voting";
 import { readVotingToken, voterKey } from "@/use-cases/voting-token";
 
 export function votingJson(data: unknown, status = 200) {
@@ -33,19 +33,21 @@ export async function publicVotingRequest(
         ? request.headers.get("x-vercel-forwarded-for") || "shared"
         : "shared";
     const bucket = createHmac("sha256", secret)
-      .update(`network:${action}:${network}`)
+      .update(`network:5m:${action}:${network}`)
       .digest("hex");
+    const networkLimit = 50;
     if (
       !(await votingRepository.rate(
         bucket,
         action,
-        action === "status" ? 60 : 50,
+        networkLimit,
+        300,
       ))
     )
       return votingJson(
         {
           error:
-            "Terlalu banyak permintaan. Tunggu 10 menit sebelum mencoba kembali.",
+            "Terlalu banyak permintaan pada jaringan ini. Tunggu 5 menit, lalu coba lagi.",
         },
         429,
       );
@@ -59,16 +61,9 @@ export async function publicVotingRequest(
           409,
         );
       const key = voterKey(nim, election.id, secret);
-      if (!(await votingRepository.rate(`nim:${key}`, "nim", 5)))
-        return votingJson(
-          {
-            error:
-              "Permintaan belum dapat diproses. Coba kembali nanti atau hubungi panitia.",
-          },
-          429,
-        );
+      const checkAllowed = await votingRepository.rate(`nim:${key}`, "nim", 5);
       return votingJson(
-        await prepareVotingSession(votingRepository, nim, election.id, secret),
+        await prepareVotingSession(votingRepository, nim, election.id, secret, input.name, Date.now(), checkAllowed),
       );
     }
     const token = readVotingToken(input.token, secret);
@@ -118,7 +113,7 @@ export async function publicVotingRequest(
           ? error.message
           : "Permintaan belum dapat diproses. Coba kembali nanti atau hubungi panitia.",
       },
-      validation ? 400 : 503,
+      error instanceof VotingCheckLimitError ? 429 : validation ? 400 : 503,
     );
   }
 }

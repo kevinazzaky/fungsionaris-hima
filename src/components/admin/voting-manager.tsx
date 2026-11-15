@@ -36,6 +36,7 @@ export function VotingManager() {
   const [csv, setCsv] = useState(""),
     [preview, setPreview] = useState<Preview | null>(null);
   const [manualNim, setManualNim] = useState("");
+  const [manualName, setManualName] = useState("");
   const [liveError, setLiveError] = useState("");
   const [startsAt, setStartsAt] = useState(""),
     [endsAt, setEndsAt] = useState("");
@@ -497,10 +498,16 @@ export function VotingManager() {
                 )}
               </section>
               <section className="admin-voting-section">
-                <h2>NIM terdaftar</h2>
+                <h2>Daftar pemilih</h2>
                 <p>
-                  Hanya NIM terdaftar yang bisa memilih, satu kali per periode.
+                  Nama dan NIM harus cocok. Satu hak pilih per periode.
                 </p>
+                <details className="admin-voting-profile-details">
+                  <summary>Nama terdaftar ({data.voters.length})</summary>
+                  {data.voters.length ? (
+                    <ul>{data.voters.map((voter) => <li key={voter.voterKey}>{voter.name} · {voter.consumed ? "Sudah memilih" : "Belum memilih"}</li>)}</ul>
+                  ) : <p>Belum ada nama. Lengkapi melalui impor CSV saat draft.</p>}
+                </details>
                 {!draft && (
                   <p>
                     Penambahan NIM dikunci karena periode sudah dijadwalkan.
@@ -514,19 +521,27 @@ export function VotingManager() {
                     const form = payload("import");
                     form.set(
                       "csv",
-                      `nim,prodi,aktif,periode\n${manualNim},TI,true,${election.period}`,
+                      `nim,nama,prodi,aktif,periode\n${manualNim},"${manualName.replaceAll('"', '""')}",TI,true,${election.period}`,
                     );
                     if (
                       await mutate(
                         form,
-                        "NIM berhasil diproses. NIM yang sudah terdaftar tidak ditambahkan ulang.",
+                        "Data pemilih berhasil diproses.",
                       )
                     ) {
                       setManualNim("");
+                      setManualName("");
                     }
                   }}
                 >
-                  <h3>Tambah satu NIM</h3>
+                  <h3>Tambah atau perbarui pemilih</h3>
+                  <label htmlFor="admin-voting-manual-name">
+                    Nama lengkap
+                    <input id="admin-voting-manual-name" name="name" value={manualName}
+                      onChange={(event) => setManualName(event.target.value)}
+                      minLength={2} maxLength={100} pattern={"[\\p{L}][\\p{L}\\p{M} .]*"}
+                      required disabled={!draft || busy} placeholder="Nama sesuai daftar mahasiswa" />
+                  </label>
                   <label htmlFor="admin-voting-manual-nim">
                     NIM
                     <input
@@ -548,30 +563,29 @@ export function VotingManager() {
                     />
                   </label>
                   <small id="admin-voting-manual-help">
-                    Untuk mahasiswa aktif TI angkatan 2024, 2025, dan 2026.
+                    Untuk mahasiswa aktif TI angkatan 2023, 2024, 2025, dan 2026.
                   </small>
                   <button
                     className="admin-button admin-button-primary"
                     type="submit"
-                    disabled={!draft || busy || manualNim.length !== 8}
+                    disabled={!draft || busy || manualNim.length !== 8 || !manualName.trim()}
                   >
-                    <PendingLabel pending={busy} text="Menambahkan NIM…">Tambahkan NIM</PendingLabel>
+                    <PendingLabel pending={busy} text="Menyimpan pemilih…">Simpan pemilih</PendingLabel>
                   </button>
                 </form>
                 <h3>Impor CSV</h3>
                 <details className="admin-voting-profile-details">
                   <summary>Format dan contoh CSV</summary>
                   <p>
-                    Gunakan kolom <code>nim,prodi,aktif,periode</code>. Isi
+                    Gunakan kolom <code>nim,nama,prodi,aktif,periode</code>. Isi
                     prodi dengan TI, aktif dengan true, dan periode dengan{" "}
                     {election.period}. Maksimal 500 KB atau 5.000 baris per
                     file.
                   </p>
                   <p>
                     Contoh data dummy:{" "}
-                    <code>00000001,TI,true,{election.period}</code>. Simpan
-                    sebagai CSV UTF-8. NIM yang sudah terdaftar tidak akan
-                    digandakan.
+                    <code>00000001,Nama Mahasiswa,TI,true,{election.period}</code>. Simpan
+                    sebagai CSV UTF-8. Impor ulang memperbarui nama tanpa menggandakan NIM.
                   </p>
                 </details>
                 <label className="admin-voting-file">
@@ -701,7 +715,7 @@ export function VotingManager() {
                             <small> permintaan</small>
                           </strong>
                           <span className="admin-voting-monitor-note">
-                            Dalam jendela aktif 10 menit
+                            Dalam jendela pembatasan yang masih aktif
                           </span>
                         </li>
                       ))}

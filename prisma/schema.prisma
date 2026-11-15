@@ -175,6 +175,7 @@ model VotingCandidate {
 model EligibleVoter {
   electionId String @map("election_id") @db.Uuid
   voterKey String @map("voter_key")
+  name String? @db.VarChar(100)
   eligible Boolean @default(true)
   consumed Boolean @default(false)
   election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
