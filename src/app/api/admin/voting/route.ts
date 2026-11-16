@@ -18,6 +18,7 @@ import { voterKey } from "@/use-cases/voting-token";
 import { uploadImage, removeFile } from "@/data/supabase/storage";
 import { MEDIA_BUCKET } from "@/lib/backend-config";
 import { votingReady } from "@/data/voting";
+import { createVotingRecap } from "@/lib/voting-export";
 
 export const runtime = "nodejs";
 
@@ -29,32 +30,13 @@ export async function GET(request: Request) {
     if (id) assertUuid(id);
     const dashboard = await votingRepository.dashboard(id);
     if (params.get("export") === "true") {
-      if (!dashboard.election || dashboard.election.status !== "closed")
-        throw new ValidationError(
-          "Rekap hanya tersedia setelah penutupan resmi.",
-        );
       return new Response(
-        JSON.stringify(
-          {
-            period: dashboard.election.period,
-            stats: dashboard.stats,
-            results: dashboard.election.candidates.map((c) => ({
-              number: c.number,
-              name: c.name,
-              votes:
-                dashboard.results?.find((r) => r.candidateId === c.id)?._count
-                  ._all || 0,
-            })),
-            audit: dashboard.logs,
-          },
-          null,
-          2,
-        ),
+        new Uint8Array(createVotingRecap(dashboard)),
         {
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "Content-Disposition":
-              'attachment; filename="rekap-pemilihan.json"',
+              `attachment; filename="rekap-pemilihan-${dashboard.election!.period.replaceAll("/", "-")}.xlsx"`,
             "Cache-Control": "no-store",
           },
         },

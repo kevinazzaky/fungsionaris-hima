@@ -308,7 +308,7 @@ export function VotingManager() {
                         className="admin-button"
                         href={`/api/admin/voting?id=${election.id}&export=true`}
                       >
-                        Unduh rekap JSON
+                        Unduh rekap Excel
                       </a>
                     )}
                   </div>
