@@ -9,6 +9,8 @@ export function votingActivityLabel(action: string): string {
     schedule_confirmed_profiles_and_dpt_locked:
       "Jadwal dikonfirmasi; kandidat dan daftar pemilih dikunci",
     election_officially_closed: "Pemilihan ditutup oleh panitia",
+    voting_opened_preserving_ballots: "Voting dibuka; suara sebelumnya dipertahankan",
+    voting_closed_preserving_ballots: "Voting ditutup sementara; suara tetap tersimpan",
   };
   if (Object.hasOwn(labels, action)) return labels[action];
   const candidate = /^candidate_(updated|added):(\d+)$/.exec(action);

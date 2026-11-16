@@ -11,9 +11,11 @@ import {
   parseVoterCsv,
   validateCandidate,
   parseVotingSchedule,
+  parseVotingDateTime,
 } from "@/domain/voting";
 import { ValidationError } from "@/domain/admin";
 import { selectVotingPeriod } from "@/use-cases/manage-voting-period";
+import { resetVotingPeriod } from "@/use-cases/voting";
 import { voterKey } from "@/use-cases/voting-token";
 import { uploadImage, removeFile } from "@/data/supabase/storage";
 import { MEDIA_BUCKET } from "@/lib/backend-config";
@@ -136,15 +138,14 @@ export async function POST(request: Request) {
       }
       return votingJson({ success: true });
     }
-    if (action === "schedule") {
+    if (action === "schedule" || action === "open") {
       if (!votingReady())
         throw new ValidationError(
           "Konfigurasi voting belum siap. Minta pengelola memeriksa mode uji dan kunci server.",
         );
-      const { startsAt, endsAt } = parseVotingSchedule(
-        form.get("startsAt"),
-        form.get("endsAt"),
-      );
+      const { startsAt, endsAt } = action === "open"
+        ? { startsAt: null, endsAt: parseVotingDateTime(form.get("endsAt")) }
+        : parseVotingSchedule(form.get("startsAt"), form.get("endsAt"));
       await votingRepository.schedule(id, startsAt, endsAt, admin.id);
       return votingJson({ success: true });
     }
@@ -152,6 +153,8 @@ export async function POST(request: Request) {
       await votingRepository.close(id, admin.id);
       return votingJson({ success: true });
     }
+    if (action === "reset")
+      return votingJson(await resetVotingPeriod(votingRepository, id, form.get("confirmation"), admin.id));
     throw new ValidationError("Tindakan tidak dikenal.");
   } catch (e) {
     if (uploaded && !saved) {

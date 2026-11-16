@@ -73,6 +73,8 @@ export const votingRepository = {
       const target = await tx.election.findUnique({ where: { id }, select: { id: true } });
       if (!target) throw new ValidationError("Pemilihan tidak ditemukan.");
       if (settings[0].election_id === id) return;
+      if (settings[0].election_id)
+        await tx.$queryRaw`SELECT id FROM elections WHERE id=${settings[0].election_id}::uuid FOR SHARE`;
       const current = settings[0].election_id
         ? await tx.election.findUnique({ where: { id: settings[0].election_id } }) : null;
       const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
@@ -239,9 +241,15 @@ export const votingRepository = {
       return previous?.photoPath || null;
     });
   },
-  async schedule(id: string, startsAt: Date, endsAt: Date, actorId: string) {
+  async schedule(id: string, startsAt: Date | null, endsAt: Date, actorId: string) {
     return getPrisma().$transaction(async (tx) => {
-      await lockDraft(tx, id);
+      const rows = await tx.$queryRaw<{ status: string; ends_at: Date | null; now: Date }[]>`
+        SELECT status,ends_at,clock_timestamp() AS now FROM elections WHERE id=${id}::uuid FOR UPDATE`;
+      const current = rows[0];
+      if (!current) throw new ValidationError("Pemilihan tidak ditemukan.");
+      if (current.status !== "draft" && current.status !== "closed" &&
+          !(current.status === "scheduled" && current.ends_at && current.ends_at <= current.now))
+        throw new ValidationError("Tutup voting sebelum mengubah jadwal.");
       const candidates = await tx.votingCandidate.findMany({
         where: { electionId: id, placeholder: false },
       });
@@ -254,22 +262,21 @@ export const votingRepository = {
         throw new ValidationError("Tambahkan NIM terdaftar sebelum mengonfirmasi jadwal.");
       if (await tx.eligibleVoter.count({ where: { electionId: id, eligible: true, name: null } }))
         throw new ValidationError("Lengkapi nama semua pemilih sebelum mengonfirmasi jadwal.");
-      const [{ now }] = await tx.$queryRaw<
-        { now: Date }[]
-      >`SELECT clock_timestamp() AS now`;
-      if (startsAt <= now || endsAt <= startsAt)
+      const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      const start = startsAt ?? now;
+      if ((startsAt && startsAt <= now) || endsAt <= start)
         throw new ValidationError(
-          "Awal harus di masa depan dan akhir harus setelah awal.",
+          startsAt ? "Awal harus di masa depan dan akhir harus setelah awal." : "Waktu selesai harus setelah waktu saat ini.",
         );
       await tx.election.update({
         where: { id },
-        data: { startsAt, endsAt, status: "scheduled" },
+        data: { startsAt: start, endsAt, status: "scheduled" },
       });
       await audit(
         tx,
         id,
         actorId,
-        "schedule_confirmed_profiles_and_dpt_locked",
+        startsAt ? "schedule_confirmed_profiles_and_dpt_locked" : "voting_opened_preserving_ballots",
       );
     });
   },
@@ -283,19 +290,35 @@ export const votingRepository = {
           "Hanya pemilihan terjadwal yang dapat ditutup.",
         );
       await tx.election.update({ where: { id }, data: { status: "closed" } });
-      await audit(tx, id, actorId, "election_officially_closed");
+      await audit(tx, id, actorId, "voting_closed_preserving_ballots");
     });
+  },
+  async reset(id: string, confirmation: string, actorId: string) {
+    try {
+      const [result] = await getPrisma().$queryRaw<{
+        ballots_removed: number; rights_restored: number; audit_action: string;
+      }[]>`SELECT * FROM reset_hima_voting_test_period(${id}::uuid,${actorId}::uuid,${confirmation})`;
+      return { ballotsRemoved: result.ballots_removed, rightsRestored: result.rights_restored, action: result.audit_action };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("voting_reset_requires_closed")) throw new ValidationError("Tutup voting sebelum mereset suara.");
+      if (message.includes("voting_reset_confirmation")) throw new ValidationError("Konfirmasi reset tidak sesuai periode.");
+      if (message.includes("voting_reset_audit_mismatch")) throw new ValidationError("Jumlah suara dan hak terpakai tidak sesuai. Hubungi pengelola sebelum reset.");
+      if (message.includes("voting_reset_not_found")) throw new ValidationError("Pemilihan tidak ditemukan.");
+      throw error;
+    }
   },
   async voterEligibility(electionId: string, key: string) {
-    return getPrisma().eligibleVoter.findUnique({
+    const voter = await getPrisma().eligibleVoter.findUnique({
       where: { electionId_voterKey: { electionId, voterKey: key } },
-      select: { eligible: true, consumed: true, name: true },
+      select: { eligible: true, consumed: true, name: true, election: { select: { tokenVersion: true } } },
     });
+    return voter ? { eligible: voter.eligible, consumed: voter.consumed, name: voter.name, tokenVersion: voter.election.tokenVersion } : null;
   },
-  async cast(electionId: string, key: string, candidateId: string) {
+  async cast(electionId: string, key: string, candidateId: string, tokenVersion = 0) {
     const result = await getPrisma().$queryRaw<
       { accepted: boolean }[]
-    >`SELECT cast_hima_ballot(${electionId}::uuid,${key},${candidateId}::uuid) AS accepted`;
+    >`SELECT cast_hima_ballot(${electionId}::uuid,${key},${candidateId}::uuid,${tokenVersion}::integer) AS accepted`;
     return result[0].accepted;
   },
   async rate(key: string, scope: string, limit: number, windowSeconds = 600) {

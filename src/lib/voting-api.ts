@@ -88,8 +88,12 @@ export async function publicVotingRequest(
         token.electionId,
         token.voterKey,
         input.candidateId,
+        token.version,
       ))
     ) {
+      const voter = await votingRepository.voterEligibility(token.electionId, token.voterKey);
+      if (voter && token.version !== voter.tokenVersion)
+        throw new ValidationError("Periode telah direset. Periksa nama dan NIM kembali.");
       await votingRepository.health("request_rejected");
       return votingJson(
         {

@@ -22,6 +22,13 @@ test("periode publik hanya membaca pilihan aktif tanpa fallback otomatis ke peri
       assert.equal(first.period, '2026/2027');
       assert.equal(first.startsAt, '2026-11-16T07:10:00.000Z');
       assert.equal(reads, 1);
+      for (const status of ['draft', 'closed']) {
+        scheduled.status = status;
+        const selected = await votingRepository.latest();
+        assert.equal(selected.id, scheduled.id);
+        assert.equal(selected.status, status);
+        assert.equal(selected.startsAt, '2026-11-16T07:10:00.000Z');
+      }
       hasActive = false; reads = 0;
       assert.equal(await votingRepository.latest(), null);
       assert.equal(reads, 1);

@@ -148,10 +148,12 @@ model Election {
   startsAt DateTime? @map("starts_at") @db.Timestamptz(3)
   endsAt DateTime? @map("ends_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  tokenVersion Int @default(0) @map("token_version")
   candidates VotingCandidate[]
   voters EligibleVoter[]
   ballots Ballot[]
   auditLogs VotingAuditLog[]
+  resetBackups VotingResetBackup[]
   activeSettings VotingSettings?
   @@map("elections")
 }
@@ -161,6 +163,16 @@ model VotingSettings {
   electionId String? @unique @map("election_id") @db.Uuid
   election Election? @relation(fields: [electionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@map("voting_settings")
+}
+
+model VotingResetBackup {
+  id String @id @default(uuid()) @db.Uuid
+  electionId String @map("election_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  snapshot Json
+  election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  @@map("voting_reset_backups")
 }
 
 model VotingCandidate {

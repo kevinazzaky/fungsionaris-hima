@@ -75,23 +75,18 @@ export const votingStateLabels: Record<VotingState, string> = {
   closed: "Pemilihan telah ditutup",
 };
 
+export function parseVotingDateTime(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))
+    throw new ValidationError("Jadwal WITA tidak valid.");
+  const local = new Date(`${value}:00Z`);
+  if (!Number.isFinite(local.getTime()) || local.toISOString().slice(0, 16) !== value)
+    throw new ValidationError("Jadwal WITA tidak valid.");
+  return new Date(local.getTime() - 8 * 60 * 60_000);
+}
+
 export function parseVotingSchedule(start: unknown, end: unknown) {
-  const parse = (value: unknown) => {
-    if (
-      typeof value !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)
-    )
-      throw new ValidationError("Jadwal WITA tidak valid.");
-    const local = new Date(`${value}:00Z`);
-    if (
-      !Number.isFinite(local.getTime()) ||
-      local.toISOString().slice(0, 16) !== value
-    )
-      throw new ValidationError("Jadwal WITA tidak valid.");
-    return new Date(local.getTime() - 8 * 60 * 60_000);
-  };
-  const startsAt = parse(start),
-    endsAt = parse(end);
+  const startsAt = parseVotingDateTime(start),
+    endsAt = parseVotingDateTime(end);
   if (endsAt <= startsAt)
     throw new ValidationError("Akhir pemilihan harus setelah awal.");
   return { startsAt, endsAt };

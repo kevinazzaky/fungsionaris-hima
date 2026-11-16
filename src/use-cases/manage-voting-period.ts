@@ -8,7 +8,7 @@ export function assertCanActivateVotingPeriod(
   if (current && current.id !== nextId && current.status === "scheduled" &&
       current.startsAt && current.endsAt &&
       now >= current.startsAt.getTime() && now < current.endsAt.getTime())
-    throw new ValidationError("Pemungutan suara periode aktif masih berlangsung. Tunggu jadwal selesai atau tutup resmi pemilihan sebelum mengganti periode aktif.");
+    throw new ValidationError("Pemungutan suara periode aktif masih berlangsung. Tunggu jadwal selesai atau tutup voting sebelum mengganti periode aktif.");
 }
 
 type PeriodRepository = {
