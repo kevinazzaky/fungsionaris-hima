@@ -303,6 +303,17 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
                   {program.fullDescription || program.body}
                 </p>
+                {program.image && (
+                  <a
+                    href={program.image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-zinc-900 underline decoration-amber-500 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-600"
+                  >
+                    Buka gambar lengkap
+                    <ArrowSquareOut size={16} aria-hidden="true" />
+                  </a>
+                )}
               </div>
 
               {/* Extra Details (Speakers, Pricing, Benefits, Contact) */}
@@ -357,7 +368,7 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                         <div className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                           Narahubung (CP)
                         </div>
-                        <p className="mt-1.5 text-xs text-zinc-700 font-medium">
+                        <p className="mt-1.5 whitespace-pre-line text-xs text-zinc-700 font-medium">
                           {program.extraDetails.contactPerson}
                         </p>
                       </div>
