@@ -4,7 +4,6 @@ import { VotingPage } from "@/components/voting/voting-page";
 import "./voting.css";
 
 export const metadata: Metadata = {
-  title: "Pemilihan Ketua",
   alternates: { canonical: "/voting" },
   robots: { index: false, follow: false },
 };

@@ -32,7 +32,7 @@ export type VotingPublicData = {
   error?: string;
 };
 export const NIM_ONLY_WARNING =
-  "Prototipe NIM-only: NIM bukan bukti identitas. Orang yang mengetahui NIM mahasiswa lain dapat menyalahgunakan hak pilihnya. Belum untuk pemilihan resmi.";
+  "Nama dan NIM bukan bukti identitas. Orang yang mengetahui pasangan nama dan NIM mahasiswa lain dapat menyalahgunakan hak pilihnya.";
 
 export function normalizeNim(value: unknown) {
   const nim = text(value, "NIM", 30);

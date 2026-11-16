@@ -276,8 +276,8 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                       </p>
                       {!data.available && (
                         <p>
-                          Layanan prototipe belum diaktifkan atau konfigurasi
-                          belum lengkap. Pemberian suara belum tersedia.
+                          Layanan pemungutan suara belum tersedia. Silakan coba
+                          lagi nanti.
                         </p>
                       )}
                       <Link

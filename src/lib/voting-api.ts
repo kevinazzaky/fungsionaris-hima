@@ -24,7 +24,7 @@ export async function publicVotingRequest(
     assertSameOrigin(request);
     if (!votingReady())
       return votingJson(
-        { error: "Layanan voting prototipe belum diaktifkan oleh panitia." },
+        { error: "Layanan pemungutan suara belum diaktifkan." },
         503,
       );
     const secret = process.env.VOTING_SECRET!;

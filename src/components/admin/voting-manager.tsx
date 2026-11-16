@@ -771,7 +771,7 @@ export function VotingManager() {
       )}
       {modal === "schedule" && (
         <EditorDialog
-          title="Konfirmasi jadwal uji prototipe"
+          title="Konfirmasi jadwal pemilihan"
           busy={busy}
           onClose={() => setModal(null)}
         >
@@ -784,7 +784,7 @@ export function VotingManager() {
               form.set("endsAt", endsAt);
               await mutate(
                 form,
-                "Jadwal uji dikonfirmasi. Kandidat dan NIM terdaftar dikunci.",
+                "Jadwal pemilihan dikonfirmasi. Kandidat dan NIM terdaftar dikunci.",
               );
             }}
           >
@@ -807,8 +807,8 @@ export function VotingManager() {
             />
             <label className="admin-voting-check">
               <input type="checkbox" required disabled={busy} />
-              Saya memahami ini hanya uji prototipe NIM-only, bukan pemilihan
-              resmi.
+              Saya telah memeriksa jadwal dan data pemilihan serta memahami
+              bahwa data akan dikunci setelah dikonfirmasi.
             </label>
             {error && (
               <p className="admin-error" role="alert">
