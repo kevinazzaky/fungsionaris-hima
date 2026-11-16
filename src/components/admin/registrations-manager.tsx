@@ -6,6 +6,7 @@ import { formatDate, requestJson } from "./request";
 import { RegistrationPrintDocument } from "@/components/pendaftaran/registration-print-document";
 import type { RegistrationDocumentData } from "@/domain/registration-document";
 import { RegistrationSettingsControl } from "./registration-settings-control";
+import { PendingLabel } from "@/components/ui/pending-label";
 
 type RegistrationRow = {
   id: string;
@@ -67,6 +68,7 @@ export function RegistrationsManager() {
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
+  const inFlight = useRef(false);
 
   const load = useCallback(
     (signal?: AbortSignal) =>
@@ -133,8 +135,9 @@ export function RegistrationsManager() {
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!detail || busy) return;
+    if (!detail || busy || inFlight.current) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    inFlight.current = true;
     setBusy(true);
     setDetailError("");
     setNotice("");
@@ -159,17 +162,19 @@ export function RegistrationsManager() {
       );
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
   async function remove(item: RegistrationRow) {
     if (
-      busy ||
+      busy || inFlight.current ||
       !window.confirm(
         `Hapus pendaftaran ${item.nama} (NIM ${item.nim})? Data dan lampiran yang tersimpan akan dihapus permanen.`,
       )
     )
       return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setDetailError("");
@@ -200,6 +205,7 @@ export function RegistrationsManager() {
       else setError(message);
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
@@ -250,6 +256,7 @@ export function RegistrationsManager() {
         </div>
       </header>
       <RegistrationSettingsControl />
+      {busy && !editing && <p role="status"><PendingLabel pending text="Memproses perubahan…">Memproses perubahan</PendingLabel></p>}
       {notice && (
         <p className="admin-success" role="status">
           {notice}
@@ -295,7 +302,7 @@ export function RegistrationsManager() {
               void load();
             }}
           >
-            Muat ulang
+            <PendingLabel pending={loading} text="Memuat pendaftar…">Muat ulang</PendingLabel>
           </button>
         </div>
       )}
@@ -455,7 +462,7 @@ export function RegistrationsManager() {
             <p role="status">Memuat rincian pendaftar...</p>
           )
         ) : editing ? (
-          <form className="admin-form" onSubmit={save}>
+          <form className="admin-form" onSubmit={save} aria-busy={busy}>
             <h3>Edit data pendaftar</h3>
             <fieldset disabled={busy}>
               {(
@@ -523,7 +530,7 @@ export function RegistrationsManager() {
               </p>
               <div className="admin-actions">
                 <button type="submit" className="admin-button primary">
-                  {busy ? "Menyimpan..." : "Simpan perubahan"}
+                  <PendingLabel pending={busy} text="Menyimpan perubahan…">Simpan perubahan</PendingLabel>
                 </button>
                 <button
                   type="button"

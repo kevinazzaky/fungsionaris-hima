@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { login } from "@/app/admin/actions";
+import { PendingLabel } from "@/components/ui/pending-label";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, { error: "" });
   return (
-    <form action={action} className="admin-form">
+    <form action={action} className="admin-form" aria-busy={pending}>
       <label>
         Email pengurus
         <input
@@ -15,6 +16,7 @@ export function LoginForm() {
           required
           maxLength={254}
           autoComplete="username"
+          disabled={pending}
         />
       </label>
       <label>
@@ -25,6 +27,7 @@ export function LoginForm() {
           required
           maxLength={200}
           autoComplete="current-password"
+          disabled={pending}
         />
       </label>
       {state.error && (
@@ -33,7 +36,7 @@ export function LoginForm() {
         </p>
       )}
       <button className="admin-button primary" type="submit" disabled={pending}>
-        {pending ? "Memeriksa akun..." : "Masuk ke admin"}
+        <PendingLabel pending={pending} text="Memeriksa akun…">Masuk ke admin</PendingLabel>
       </button>
     </form>
   );

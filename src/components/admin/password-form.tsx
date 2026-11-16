@@ -2,13 +2,14 @@
 
 import { useActionState } from "react";
 import { changePasswordAction } from "@/app/admin/actions";
+import { PendingLabel } from "@/components/ui/pending-label";
 
 export function PasswordForm({ email }: { email: string }) {
   const [state, action, pending] = useActionState(changePasswordAction, {
     error: "",
   });
   return (
-    <form action={action} className="admin-form">
+    <form action={action} className="admin-form" aria-busy={pending}>
       <fieldset disabled={pending}>
         <input
           name="username"
@@ -62,7 +63,7 @@ export function PasswordForm({ email }: { email: string }) {
         )}
         <div>
           <button className="admin-button primary" type="submit">
-            {pending ? "Mengganti kata sandi..." : "Simpan kata sandi baru"}
+            <PendingLabel pending={pending} text="Mengganti kata sandi…">Simpan kata sandi baru</PendingLabel>
           </button>
         </div>
         {pending && (

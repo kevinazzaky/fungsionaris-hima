@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/admin/actions";
@@ -10,6 +10,7 @@ const links = [
   ["/admin/fungsionaris", "Fungsionaris"],
   ["/admin/galeri", "Galeri"],
   ["/admin/program-kerja", "Program kerja"],
+  ["/admin/voting", "Pemilihan Ketua"],
   ["/admin/akun", "Akun admin"],
 ];
 

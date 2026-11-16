@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Megaphone, X } from "@phosphor-icons/react/dist/ssr";
 import { motion, AnimatePresence } from "motion/react";

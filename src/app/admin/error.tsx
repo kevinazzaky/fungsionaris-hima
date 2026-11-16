@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/navigation-link";
 
 export default function AdminError({ reset }: { reset: () => void }) {
   return (

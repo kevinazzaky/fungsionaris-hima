@@ -26,7 +26,7 @@ export function mediaUrl(path: string) {
 
 export async function uploadImage(
   file: File,
-  folder: "members" | "gallery" | "hero" | "programs",
+  folder: "members" | "gallery" | "hero" | "programs" | "candidates",
 ) {
   if (!file.size || file.size > MAX_UPLOAD_BYTES)
     throw new ValidationError("Foto maksimal 3 MB.");

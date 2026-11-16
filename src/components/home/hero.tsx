@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { HeroSlideshow } from "@/components/home/hero-slideshow";
@@ -58,8 +57,8 @@ export function Hero({ images }: { images: GalleryPhoto[] }) {
           </p>
 
           <div className="animate-fade-up mt-8 flex flex-wrap items-center gap-4 [animation-delay:540ms]">
-            <Link
-              href="/#pendaftaran"
+            <a
+              href="#pendaftaran"
               className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 text-sm font-bold text-zinc-950 shadow-[0_0_32px_-6px_rgba(251,191,36,0.6)] transition-all duration-200 hover:bg-amber-300 hover:shadow-[0_0_44px_-4px_rgba(251,191,36,0.85)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
             >
               Gabung Bersama Kami
@@ -68,13 +67,13 @@ export function Hero({ images }: { images: GalleryPhoto[] }) {
                 weight="bold"
                 className="transition-transform duration-200 group-hover:translate-x-1"
               />
-            </Link>
-            <Link
-              href="/#about"
+            </a>
+            <a
+              href="#about"
               className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:border-amber-400 hover:bg-white/10 hover:text-amber-400 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
             >
               Tentang Kami
-            </Link>
+            </a>
           </div>
         </div>
       </div>

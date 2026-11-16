@@ -8,5 +8,6 @@ import { RegistrationFloatingCta } from "@/components/ui/registration-floating-c
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return <>{children}</>;
-  return <><Navbar /><main className="flex flex-1 flex-col">{children}</main><Footer /><RegistrationFloatingCta /></>;
+  const isVoting = pathname === "/voting" || pathname.startsWith("/voting/");
+  return <><Navbar /><main className="flex flex-1 flex-col">{children}</main><Footer />{!isVoting && <RegistrationFloatingCta />}</>;
 }

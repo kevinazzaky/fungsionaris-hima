@@ -140,3 +140,82 @@ model RegistrationSettings {
   isOpen Boolean @default(true)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
+
+model Election {
+  id String @id @default(uuid()) @db.Uuid
+  period String @unique
+  status String @default("draft")
+  startsAt DateTime? @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime? @map("ends_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  candidates VotingCandidate[]
+  voters EligibleVoter[]
+  ballots Ballot[]
+  auditLogs VotingAuditLog[]
+  @@map("elections")
+}
+
+model VotingCandidate {
+  id String @id @default(uuid()) @db.Uuid
+  electionId String @map("election_id") @db.Uuid
+  number Int
+  name String @default("")
+  vision String @default("")
+  missions String[] @default([])
+  programs Json @default("[]")
+  photoPath String? @map("photo_path")
+  placeholder Boolean @default(true)
+  election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  ballots Ballot[]
+  @@unique([electionId, number])
+  @@unique([id, electionId])
+  @@map("candidates")
+}
+
+model EligibleVoter {
+  electionId String @map("election_id") @db.Uuid
+  voterKey String @map("voter_key")
+  name String? @db.VarChar(100)
+  eligible Boolean @default(true)
+  consumed Boolean @default(false)
+  election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  @@id([electionId, voterKey])
+  @@map("eligible_voters")
+}
+
+model Ballot {
+  id String @id @default(uuid()) @db.Uuid
+  electionId String @map("election_id") @db.Uuid
+  candidateId String @map("candidate_id") @db.Uuid
+  election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  candidate VotingCandidate @relation(fields: [candidateId, electionId], references: [id, electionId], onDelete: Restrict)
+  @@index([electionId, candidateId], map: "ballots_election_candidate")
+  @@map("ballots")
+}
+
+model VotingAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  electionId String @map("election_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  election Election @relation(fields: [electionId], references: [id], onDelete: Restrict)
+  @@map("audit_logs")
+}
+
+model VotingRateLimit {
+  key String @id
+  scope String
+  hits Int @default(1)
+  denied Int @default(0)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  @@index([expiresAt], map: "voting_rate_expiry")
+  @@map("voting_rate_limits")
+}
+
+model VotingHealth {
+  code String @id
+  count Int @default(1)
+  lastSeen DateTime @default(now()) @map("last_seen") @db.Timestamptz
+  @@map("voting_health")
+}
