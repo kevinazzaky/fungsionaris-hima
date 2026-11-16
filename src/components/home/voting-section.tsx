@@ -40,7 +40,7 @@ export function VotingSection() {
             Buka halaman pemilihan
           </Link>
           <p className="mt-4 text-xs leading-relaxed text-zinc-300">
-            Pemungutan suara mengikuti jadwal yang ditetapkan panitia.
+            Pemungutan suara berlangsung sesuai jadwal pemilihan.
           </p>
         </div>
       </div>
