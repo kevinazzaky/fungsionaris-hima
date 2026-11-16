@@ -1,5 +1,13 @@
 # E-voting HIMA TI (prototipe NIM-only)
 
+## Pemilihan periode aktif
+
+Admin memilih tahun pada `/admin/voting`, lalu menekan **Jadikan periode aktif**. Dropdown hanya membuka data untuk dikelola; membuat draft atau memilih tahun lain tidak mengganti periode publik. Penanda **Aktif** menunjukkan periode publik saat ini. Halaman admin secara default membuka periode aktif.
+
+Pilihan disimpan pada singleton `voting_settings` dan digunakan oleh halaman publik serta pemeriksaan hak pilih. Tanpa pilihan aktif, aplikasi tidak otomatis memilih periode lain. Status draft, jadwal mulai/selesai, dan penutupan tetap berlaku; mengaktifkan periode tidak membuka voting, menghapus suara, atau mereset hak pilih. Pergantian ke periode lain ditolak selama jadwal pemungutan periode aktif masih berjalan; tunggu selesai atau tutup resmi pemilihan dahulu. Perubahan dicatat dalam audit.
+
+Migrasi `20261116000000_active_voting_period` menambahkan pengaturan dengan RLS dan mencabut akses langsung `anon`/`authenticated`. Saat pemasangan pertama, periode terjadwal diprioritaskan sebagai pilihan awal; jika tidak ada, tahun tertinggi dipilih. Setelah itu pilihan hanya diubah admin. Pada Supabase HIMA, pilihan awal yang diverifikasi adalah **2026/2027**. Pengaturan ini terpisah dari periode program kerja dan pendaftaran fungsionaris.
+
 ## Lingkup dan tampilan
 
 Implementasi mengikuti Next.js App Router, lapisan domain/use case/repository, Prisma PostgreSQL, Supabase Auth dan Storage existing. Tidak ada framework atau database baru. `/voting` memakai navbar/footer publik; `/admin/voting` memakai layout dan autentikasi admin existing. Sesuai arahan pengguna, akses voting tidak ditambahkan ke navbar: section khusus setelah Tentang Kami menjadi pintu masuk utama di beranda, dengan tautan tambahan di footer. Ikon CheckSquare menandai tindakan memilih; panel kanan memisahkan informasi dan CTA dari pengantar tanpa mengubah hero existing.

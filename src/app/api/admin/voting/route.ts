@@ -69,6 +69,10 @@ export async function POST(request: Request) {
       );
     const id = String(form.get("id") || "");
     assertUuid(id);
+    if (action === "activate") {
+      await votingRepository.activate(id, admin.id);
+      return votingJson({ success: true });
+    }
     if (action === "preview" || action === "import") {
       const csv = form.get("csv");
       if (typeof csv !== "string")

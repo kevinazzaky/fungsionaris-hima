@@ -152,7 +152,15 @@ model Election {
   voters EligibleVoter[]
   ballots Ballot[]
   auditLogs VotingAuditLog[]
+  activeSettings VotingSettings?
   @@map("elections")
+}
+
+model VotingSettings {
+  id String @id @default("main")
+  electionId String? @unique @map("election_id") @db.Uuid
+  election Election? @relation(fields: [electionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("voting_settings")
 }
 
 model VotingCandidate {

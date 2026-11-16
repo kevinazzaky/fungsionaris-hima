@@ -255,11 +255,12 @@ export function VotingManager() {
                 </option>
                 {periods.map((period) => (
                   <option key={period} value={period}>
-                    {period}
+                    {period}{data.elections.some((item) => item.period === period && item.id === data.activeElectionId) ? " · Aktif" : ""}
                   </option>
                 ))}
               </select>
             </label>
+            <p>Memilih tahun hanya membuka data periode tersebut. Gunakan “Jadikan periode aktif” untuk menampilkannya di halaman publik.</p>
           </div>
           {!election ? (
             <section className="admin-voting-section">
@@ -277,8 +278,21 @@ export function VotingManager() {
                   <div>
                     <h2>Periode {election.period}</h2>
                     <p>{votingStateLabels[electionState(election)]}</p>
+                    <p>{data.activeElectionId === election.id
+                      ? "Periode aktif di halaman publik"
+                      : "Periode ini tidak ditampilkan di halaman publik"}</p>
                   </div>
                   <div className="admin-actions">
+                    {data.activeElectionId !== election.id && (
+                      <button
+                        className="admin-button"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void mutate(payload("activate"), `Periode ${election.period} aktif di halaman publik. Jadwal pemungutan suara tetap berlaku.`)}
+                      >
+                        Jadikan periode aktif
+                      </button>
+                    )}
                     {draft ? (
                       <button
                         className="admin-button admin-button-primary"

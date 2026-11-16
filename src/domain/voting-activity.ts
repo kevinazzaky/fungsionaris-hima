@@ -1,6 +1,7 @@
 export function votingActivityLabel(action: string): string {
   const labels: Record<string, string> = {
     draft_created: "Draft periode pemilihan dibuat",
+    public_period_activated: "Periode dijadikan aktif di halaman publik",
     candidates_replaced_from_sheet:
       "Daftar kandidat diganti dari spreadsheet panitia",
     candidate_removed_and_numbers_reordered:

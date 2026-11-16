@@ -6,6 +6,7 @@ import type { VotingElection, CandidateInput } from "@/domain/voting";
 import { assertVotingCandidatesReady } from "@/domain/voting";
 import { ValidationError } from "@/domain/admin";
 import { loadAdminVotingResults } from "@/use-cases/voting";
+import { assertCanActivateVotingPeriod } from "@/use-cases/manage-voting-period";
 
 type ElectionRow = Prisma.ElectionGetPayload<{ include: { candidates: true } }>;
 
@@ -59,10 +60,26 @@ export const votingRepository = {
     }),
   async latest() {
     const e = await getPrisma().election.findFirst({
-      orderBy: { createdAt: "desc" },
+      where: { activeSettings: { is: { id: "main" } } },
       include: { candidates: true },
     });
     return e ? publicElection(e) : null;
+  },
+  async activate(id: string, actorId: string) {
+    await getPrisma().$transaction(async (tx) => {
+      const settings = await tx.$queryRaw<{ election_id: string | null }[]>`
+        SELECT election_id FROM voting_settings WHERE id='main' FOR UPDATE`;
+      if (!settings.length) throw new ValidationError("Pengaturan periode aktif belum tersedia.");
+      const target = await tx.election.findUnique({ where: { id }, select: { id: true } });
+      if (!target) throw new ValidationError("Pemilihan tidak ditemukan.");
+      if (settings[0].election_id === id) return;
+      const current = settings[0].election_id
+        ? await tx.election.findUnique({ where: { id: settings[0].election_id } }) : null;
+      const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      assertCanActivateVotingPeriod(current, id, now.getTime());
+      await tx.votingSettings.update({ where: { id: "main" }, data: { electionId: id } });
+      await audit(tx, id, actorId, "public_period_activated");
+    });
   },
   async create(period: string, actorId: string) {
     return getPrisma().$transaction(async (tx) => {
@@ -79,10 +96,13 @@ export const votingRepository = {
         orderBy: { createdAt: "desc" },
         select: { id: true, period: true },
       });
-      const selectedId = id || elections[0]?.id;
+      const active = await tx.votingSettings.findUnique({ where: { id: "main" } });
+      const activeElectionId = active?.electionId || null;
+      const selectedId = id || activeElectionId || elections[0]?.id;
       if (!selectedId)
         return {
           elections,
+          activeElectionId,
           election: null,
           stats: null,
           results: null,
@@ -127,6 +147,7 @@ export const votingRepository = {
       });
       return {
         elections,
+        activeElectionId,
         election: publicElection(e),
         stats: {
           total,

@@ -1,4 +1,15 @@
-import { validatePeriod } from "../domain/admin";
+import { validatePeriod, ValidationError } from "../domain/admin";
+
+export function assertCanActivateVotingPeriod(
+  current: { id: string; status: string; startsAt: Date | null; endsAt: Date | null } | null,
+  nextId: string,
+  now = Date.now(),
+) {
+  if (current && current.id !== nextId && current.status === "scheduled" &&
+      current.startsAt && current.endsAt &&
+      now >= current.startsAt.getTime() && now < current.endsAt.getTime())
+    throw new ValidationError("Pemungutan suara periode aktif masih berlangsung. Tunggu jadwal selesai atau tutup resmi pemilihan sebelum mengganti periode aktif.");
+}
 
 type PeriodRepository = {
   findPeriod(period: string): Promise<{ id: string } | null>;
