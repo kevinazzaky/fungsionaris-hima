@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   normalizeNim,
   normalizeVoterName,
+  filterVoterNameInput,
   parseVoterCsv,
   electionState,
   validateCandidate,
@@ -22,6 +23,22 @@ test("nama pemilih menerima huruf Unicode, spasi dan titik dengan panjang terbat
   assert.equal(normalizeVoterName("Cipriana dos Reis de .A.Soares"), "Cipriana dos Reis de .A.Soares");
   for (const value of [null, 123, "", "  ", "..", "A", "A".repeat(101), "Bayu123", "<script>alert(1)</script>", "Robert'); DROP TABLE voters;--", "Bayu\nTrias", "Bayu😀", "Bayu\u200bTrias"])
     assert.throws(() => normalizeVoterName(value));
+});
+
+test("kolom nama membuang simbol dari ketikan dan tempelan tanpa merusak nama bertitik atau Unicode", () => {
+  for (const [input, expected] of [
+    ["A.A Ngurah Agung", "A.A Ngurah Agung"],
+    ["Jose\u0301", "Jose\u0301"],
+    ["Bayu123@#😀", "Bayu"],
+    ["Bayu\n\tTrias\u200b", "BayuTrias"],
+    ['SELECT * FROM users WHERE username = " OR 1=1', "SELECT  FROM users WHERE username   OR "],
+    ["", ""],
+  ]) assert.equal(filterVoterNameInput(input), expected);
+});
+
+test("server menolak karakter kontrol di awal atau akhir nama, bukan menyembunyikannya lewat trim", () => {
+  for (const name of ["\nBayu", "Bayu\n", "\tBayu", "Bayu\r", "Bayu\u0000", "Bayu\u00a0"])
+    assert.throws(() => normalizeVoterName(name));
 });
 
 test("NIM tetap string, mempertahankan nol awal dan menolak input ambigu", () => {

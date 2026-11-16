@@ -11,6 +11,7 @@ import { checkVotingSubmission, submitVotingChoice, VotingRequestError, type Sub
 import { fetchVotingUpdate } from "@/lib/voting-updates";
 import {
   electionState,
+  filterVoterNameInput,
   normalizeVoterName,
   votingStateLabels,
   type VotingCandidate,
@@ -293,7 +294,7 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                         name="name"
                         type="text"
                         value={name}
-                        onChange={(event) => setName(event.target.value)}
+                        onChange={(event) => setName(filterVoterNameInput(event.target.value))}
                         minLength={2}
                         maxLength={100}
                         pattern={"[\\p{L}][\\p{L}\\p{M} .]*"}

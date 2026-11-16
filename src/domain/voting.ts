@@ -41,8 +41,13 @@ export function normalizeNim(value: unknown) {
   return nim;
 }
 
+export function filterVoterNameInput(value: string) {
+  return value.replace(/[^\p{L}\p{M} .]/gu, "");
+}
+
 export function normalizeVoterName(value: unknown) {
   if (typeof value !== "string" || value.length > 100 ||
+      filterVoterNameInput(value) !== value ||
       !/^\p{L}[\p{L}\p{M} .]*$/u.test(value.trim()))
     throw new ValidationError("Nama hanya boleh berisi huruf, spasi, dan titik, 2–100 karakter.");
   const name = value.trim().normalize("NFC").replace(/ +/g, " ");

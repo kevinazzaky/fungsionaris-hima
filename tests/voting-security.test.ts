@@ -80,3 +80,21 @@ test("hasil admin tersedia selama terjadwal dan tetap tersedia setelah ditutup",
     ]);
   assert.equal(reads, 2);
 });
+
+test("payload nama atau NIM ditolak sebelum pencarian pemilih dan tidak menerbitkan token", async () => {
+  let reads = 0;
+  const repository = { voterEligibility: async () => {
+    reads++;
+    return { eligible: true, consumed: false, name: "Bayu Trias" };
+  } };
+  for (const [nim, name] of [
+    ["42430029", 'SELECT * FROM users WHERE username = " OR 1=1'],
+    ["42430029", '<img src=x onerror=alert(1)>'],
+    ["42430029", { $ne: null }],
+    ["42430029", "Bayu\n"],
+    ["1 OR 1=1", "Bayu Trias"],
+    [{ $gt: "" }, "Bayu Trias"],
+  ]) await assert.rejects(prepareVotingSession(repository, nim, "test-election",
+    "test-secret-only-longer-than-32-characters", name));
+  assert.equal(reads, 0);
+});
