@@ -62,7 +62,7 @@ export function capacityFixtureSource(source: string) {
 }
 
 export function fontFreeFixtureSource(source: string) {
-  const imported = /^import \{[^\n]+\} from "next\/font\/google";\n/m;
+  const imported = /^import \{[^\n]+\} from "next\/font\/google";\r?\n/m;
   const definitions = /const figtree = Figtree\([\s\S]*?(?=const siteUrl =)/;
   if (!imported.test(source) || !definitions.test(source)) throw new Error("Layout font berubah; periksa salinan uji.");
   const local = ["figtree","geistMono","playfairDisplay","poppins","rubik"].map(name => `const ${name} = { variable: "" };`).join("\n");
