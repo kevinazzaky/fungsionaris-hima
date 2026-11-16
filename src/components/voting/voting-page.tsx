@@ -269,7 +269,7 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                       </h2>
                       <p className="voting-panel-description">
                         {status === "ended" || status === "closed"
-                          ? "Pemungutan suara periode ini sudah berakhir. Informasi selanjutnya akan disampaikan oleh panitia HIMA TI."
+                          ? "Pemungutan suara periode ini sudah berakhir. Informasi selanjutnya akan disampaikan oleh pengurus HIMA TI."
                           : status === "upcoming"
                             ? `Pemungutan suara dimulai ${schedule(data.election?.startsAt)}.`
                             : "Pemilihan akan segera dibuka. Nantikan jadwal dan informasi selanjutnya."}
@@ -285,7 +285,7 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                     <form method="post" onSubmit={checkNim} aria-busy={busy}>
                       <h2>Mulai dari nama dan NIM</h2>
                       <p className="voting-panel-description">
-                        Masukkan nama lengkap dan NIM sesuai daftar pemilih.
+                        Masukkan nama lengkap dan NIM kamu untuk memilih.
                       </p>
                       <label htmlFor="voting-name">Nama lengkap</label>
                       <input
