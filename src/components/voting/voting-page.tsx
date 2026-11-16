@@ -269,7 +269,9 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                           : "Suaramu segera mendapat giliran"}
                       </h2>
                       <p className="voting-panel-description">
-                        {status === "ended" || status === "closed"
+                        {status === "closed"
+                          ? "Pemungutan suara sedang ditutup oleh panitia. Informasi selanjutnya akan disampaikan oleh pengurus HIMA TI."
+                          : status === "ended"
                           ? "Pemungutan suara periode ini sudah berakhir. Informasi selanjutnya akan disampaikan oleh pengurus HIMA TI."
                           : status === "upcoming"
                             ? `Pemungutan suara dimulai ${schedule(data.election?.startsAt)}.`

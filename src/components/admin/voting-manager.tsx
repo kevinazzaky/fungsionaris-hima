@@ -22,7 +22,21 @@ type Preview = {
   issues: { row: number; message: string }[];
   sample: string[];
 };
-type Modal = "candidate" | "schedule" | "close" | null;
+type Modal = "candidate" | "schedule" | "open" | "close" | "reset" | null;
+
+function witaInput(date: Date) {
+  return date
+    .toLocaleString("sv-SE", {
+      timeZone: "Asia/Makassar",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .replace(" ", "T");
+}
 
 export function VotingManager() {
   const [data, setData] = useState<VotingDashboardData | null>(null);
@@ -40,10 +54,16 @@ export function VotingManager() {
   const [liveError, setLiveError] = useState("");
   const [startsAt, setStartsAt] = useState(""),
     [endsAt, setEndsAt] = useState("");
+  const [resetConfirmation, setResetConfirmation] = useState("");
   const inFlight = useRef(false),
     version = useRef(0);
+  const pageHeading = useRef<HTMLHeadingElement>(null);
   const election = data?.election;
   const draft = election?.status === "draft";
+  const canOpen =
+    draft ||
+    election?.status === "closed" ||
+    (election && electionState(election) === "ended");
   const addedCandidates =
     election?.candidates.filter((c) => !c.placeholder) || [];
   const currentYear = new Date().getFullYear();
@@ -95,7 +115,8 @@ export function VotingManager() {
 
   useEffect(() => {
     const id = election?.id;
-    if (!id || election.status !== "scheduled" || loading || busy || modal) return;
+    if (!id || election.status !== "scheduled" || loading || busy || modal)
+      return;
     let active = true;
     let pending = false;
     const requestVersion = version.current;
@@ -114,7 +135,11 @@ export function VotingManager() {
         }
       } catch (e) {
         if (active && requestVersion === version.current)
-          setLiveError(e instanceof Error ? e.message : "Pembaruan hasil gagal. Tekan Muat ulang.");
+          setLiveError(
+            e instanceof Error
+              ? e.message
+              : "Pembaruan hasil gagal. Tekan Muat ulang.",
+          );
       } finally {
         pending = false;
       }
@@ -135,6 +160,16 @@ export function VotingManager() {
     if (election) form.set("id", election.id);
     return form;
   }
+  function showSchedule(action: "open" | "schedule") {
+    const now = Date.now();
+    const end = election?.endsAt ? new Date(election.endsAt).getTime() : 0;
+    setStartsAt(witaInput(new Date(now + 5 * 60_000)));
+    setEndsAt(
+      witaInput(new Date(end > now + 5 * 60_000 ? end : now + 60 * 60_000)),
+    );
+    setError("");
+    setModal(action);
+  }
   async function mutate(form: FormData, success: string) {
     if (inFlight.current) return false;
     inFlight.current = true;
@@ -142,16 +177,20 @@ export function VotingManager() {
     setError("");
     setMessage("");
     try {
-      const result = await requestJson<{ id?: string }>("/api/admin/voting", {
-        method: "POST",
-        body: form,
-      });
-      setMessage(success);
+      const result = await requestJson<{ id?: string; action?: string }>(
+        "/api/admin/voting",
+        {
+          method: "POST",
+          body: form,
+        },
+      );
+      setMessage(result.action ? votingActivityLabel(result.action) : success);
       setModal(null);
       if (form.get("action") === "create" && result.id) {
         setSelectedId(result.id);
         await load(result.id);
       } else await load();
+      pageHeading.current?.focus({ preventScroll: true });
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Penyimpanan gagal.");
@@ -186,7 +225,9 @@ export function VotingManager() {
     <>
       <div className="admin-page-header">
         <div>
-          <h1>Pemilihan Ketua</h1>
+          <h1 ref={pageHeading} tabIndex={-1}>
+            Pemilihan Ketua
+          </h1>
           <p>Kelola kandidat, NIM terdaftar, dan periode pemilihan HIMA TI.</p>
         </div>
         <button
@@ -198,7 +239,9 @@ export function VotingManager() {
             void load();
           }}
         >
-          <PendingLabel pending={loading} text="Memuat data…">Muat ulang</PendingLabel>
+          <PendingLabel pending={loading} text="Memuat data…">
+            Muat ulang
+          </PendingLabel>
         </button>
       </div>
       {message && (
@@ -211,7 +254,11 @@ export function VotingManager() {
           {error}
         </p>
       )}
-      {loading && <div className="route-loading" role="status"><PendingLabel pending text="Memuat pemilihan…" /></div>}
+      {loading && (
+        <div className="route-loading" role="status">
+          <PendingLabel pending text="Memuat pemilihan…" />
+        </div>
+      )}
       {!loading && !data && (
         <p>
           Data belum tersedia. Jika tabel belum dibuat, jalankan migration pada
@@ -255,12 +302,18 @@ export function VotingManager() {
                 </option>
                 {periods.map((period) => (
                   <option key={period} value={period}>
-                    {period}{data.elections.some((item) => item.period === period && item.id === data.activeElectionId) ? " · Aktif" : ""}
+                    {period}
+                    {data.elections.some(
+                      (item) =>
+                        item.period === period &&
+                        item.id === data.activeElectionId,
+                    )
+                      ? " · Aktif"
+                      : ""}
                   </option>
                 ))}
               </select>
             </label>
-            <p>Memilih tahun hanya membuka data periode tersebut. Gunakan “Jadikan periode aktif” untuk menampilkannya di halaman publik.</p>
           </div>
           {!election ? (
             <section className="admin-voting-section">
@@ -278,9 +331,11 @@ export function VotingManager() {
                   <div>
                     <h2>Periode {election.period}</h2>
                     <p>{votingStateLabels[electionState(election)]}</p>
-                    <p>{data.activeElectionId === election.id
-                      ? "Periode aktif di halaman publik"
-                      : "Periode ini tidak ditampilkan di halaman publik"}</p>
+                    <p>
+                      {data.activeElectionId === election.id
+                        ? "Periode aktif di halaman publik"
+                        : "Periode ini tidak ditampilkan di halaman publik"}
+                    </p>
                   </div>
                   <div className="admin-actions">
                     {data.activeElectionId !== election.id && (
@@ -288,24 +343,37 @@ export function VotingManager() {
                         className="admin-button"
                         type="button"
                         disabled={busy}
-                        onClick={() => void mutate(payload("activate"), `Periode ${election.period} aktif di halaman publik. Jadwal pemungutan suara tetap berlaku.`)}
+                        onClick={() =>
+                          void mutate(
+                            payload("activate"),
+                            `Periode ${election.period} aktif di halaman publik. Jadwal pemungutan suara tetap berlaku.`,
+                          )
+                        }
                       >
                         Jadikan periode aktif
                       </button>
                     )}
-                    {draft ? (
-                      <button
-                        className="admin-button admin-button-primary"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => {
-                          setError("");
-                          setModal("schedule");
-                        }}
-                      >
-                        Atur dan konfirmasi jadwal uji
-                      </button>
-                    ) : election.status === "scheduled" ? (
+                    {canOpen && (
+                      <>
+                        <button
+                          className="admin-button admin-button-primary"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => showSchedule("open")}
+                        >
+                          {draft ? "Buka voting" : "Buka kembali"}
+                        </button>
+                        <button
+                          className="admin-button"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => showSchedule("schedule")}
+                        >
+                          Atur jadwal
+                        </button>
+                      </>
+                    )}
+                    {election.status === "scheduled" && (
                       <button
                         className="admin-button"
                         type="button"
@@ -315,28 +383,51 @@ export function VotingManager() {
                           setModal("close");
                         }}
                       >
-                        Tutup resmi pemilihan
+                        Tutup voting
                       </button>
-                    ) : (
-                      <a
-                        className="admin-button"
-                        href={`/api/admin/voting?id=${election.id}&export=true`}
-                      >
-                        Unduh rekap Excel
-                      </a>
+                    )}
+                    {election.status === "closed" && (
+                      <>
+                        <button
+                          className="admin-button danger"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            setError("");
+                            setResetConfirmation("");
+                            setModal("reset");
+                          }}
+                        >
+                          Reset suara
+                        </button>
+                        <a
+                          className="admin-button"
+                          href={`/api/admin/voting?id=${election.id}&export=true`}
+                        >
+                          Unduh rekap Excel
+                        </a>
+                      </>
                     )}
                   </div>
                 </div>
-                <p>
-                  Mulai: {formatDate(election.startsAt)} WITA · Selesai:{" "}
-                  {formatDate(election.endsAt)} WITA
-                </p>
+                {election.startsAt && election.endsAt ? (
+                  <p>
+                    Mulai: {formatDate(election.startsAt)} WITA · Selesai:{" "}
+                    {formatDate(election.endsAt)} WITA
+                  </p>
+                ) : (
+                  <p>
+                    Jadwal belum diatur. Buka sekarang atau atur jadwal terlebih
+                    dahulu.
+                  </p>
+                )}
                 {!draft && (
                   <p>
                     <strong>
-                      Profil kandidat, NIM terdaftar, dan jadwal telah dikunci.
+                      Profil kandidat dan NIM terdaftar telah dikunci.
                     </strong>{" "}
-                    Pemilihan yang ditutup tidak dapat dibuka kembali.
+                    Voting dapat ditutup dan dibuka kembali. Suara yang sudah
+                    masuk tetap tersimpan.
                   </p>
                 )}
                 {data.stats && (
@@ -469,18 +560,23 @@ export function VotingManager() {
               <section className="admin-voting-section">
                 <h2>Hasil per kandidat</h2>
                 {data.results === null ? (
-                  <p>
-                    Hasil tersedia setelah pemilihan dijadwalkan.
-                  </p>
+                  <p>Hasil tersedia setelah pemilihan dijadwalkan.</p>
                 ) : (
                   <div className="admin-table-wrap admin-voting-results">
                     {election.status === "scheduled" && (
                       <p>Diperbarui otomatis setiap 5 detik.</p>
                     )}
-                    {liveError && <p className="admin-error" role="alert">{liveError}</p>}
+                    {liveError && (
+                      <p className="admin-error" role="alert">
+                        {liveError}
+                      </p>
+                    )}
                     <table>
                       <caption>
-                        {election.status === "closed" ? "Hasil akhir" : "Hasil sementara"} periode {election.period}
+                        {election.status === "closed"
+                          ? "Hasil saat ditutup"
+                          : "Hasil sementara"}{" "}
+                        periode {election.period}
                       </caption>
                       <thead>
                         <tr>
@@ -513,14 +609,23 @@ export function VotingManager() {
               </section>
               <section className="admin-voting-section">
                 <h2>Daftar pemilih</h2>
-                <p>
-                  Nama dan NIM harus cocok. Satu hak pilih per periode.
-                </p>
+                <p>Nama dan NIM harus cocok. Satu hak pilih per periode.</p>
                 <details className="admin-voting-profile-details">
                   <summary>Nama terdaftar ({data.voters.length})</summary>
                   {data.voters.length ? (
-                    <ul>{data.voters.map((voter) => <li key={voter.voterKey}>{voter.name} · {voter.consumed ? "Sudah memilih" : "Belum memilih"}</li>)}</ul>
-                  ) : <p>Belum ada nama. Lengkapi melalui impor CSV saat draft.</p>}
+                    <ul>
+                      {data.voters.map((voter) => (
+                        <li key={voter.voterKey}>
+                          {voter.name} ·{" "}
+                          {voter.consumed ? "Sudah memilih" : "Belum memilih"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>
+                      Belum ada nama. Lengkapi melalui impor CSV saat draft.
+                    </p>
+                  )}
                 </details>
                 {!draft && (
                   <p>
@@ -537,12 +642,7 @@ export function VotingManager() {
                       "csv",
                       `nim,nama,prodi,aktif,periode\n${manualNim},"${manualName.replaceAll('"', '""')}",TI,true,${election.period}`,
                     );
-                    if (
-                      await mutate(
-                        form,
-                        "Data pemilih berhasil diproses.",
-                      )
-                    ) {
+                    if (await mutate(form, "Data pemilih berhasil diproses.")) {
                       setManualNim("");
                       setManualName("");
                     }
@@ -551,10 +651,18 @@ export function VotingManager() {
                   <h3>Tambah atau perbarui pemilih</h3>
                   <label htmlFor="admin-voting-manual-name">
                     Nama lengkap
-                    <input id="admin-voting-manual-name" name="name" value={manualName}
+                    <input
+                      id="admin-voting-manual-name"
+                      name="name"
+                      value={manualName}
                       onChange={(event) => setManualName(event.target.value)}
-                      minLength={2} maxLength={100} pattern={"[\\p{L}][\\p{L}\\p{M} .]*"}
-                      required disabled={!draft || busy} placeholder="Nama sesuai daftar mahasiswa" />
+                      minLength={2}
+                      maxLength={100}
+                      pattern={"[\\p{L}][\\p{L}\\p{M} .]*"}
+                      required
+                      disabled={!draft || busy}
+                      placeholder="Nama sesuai daftar mahasiswa"
+                    />
                   </label>
                   <label htmlFor="admin-voting-manual-nim">
                     NIM
@@ -577,14 +685,22 @@ export function VotingManager() {
                     />
                   </label>
                   <small id="admin-voting-manual-help">
-                    Untuk mahasiswa aktif TI angkatan 2023, 2024, 2025, dan 2026.
+                    Untuk mahasiswa aktif TI angkatan 2023, 2024, 2025, dan
+                    2026.
                   </small>
                   <button
                     className="admin-button admin-button-primary"
                     type="submit"
-                    disabled={!draft || busy || manualNim.length !== 8 || !manualName.trim()}
+                    disabled={
+                      !draft ||
+                      busy ||
+                      manualNim.length !== 8 ||
+                      !manualName.trim()
+                    }
                   >
-                    <PendingLabel pending={busy} text="Menyimpan pemilih…">Simpan pemilih</PendingLabel>
+                    <PendingLabel pending={busy} text="Menyimpan pemilih…">
+                      Simpan pemilih
+                    </PendingLabel>
                   </button>
                 </form>
                 <h3>Impor CSV</h3>
@@ -598,8 +714,11 @@ export function VotingManager() {
                   </p>
                   <p>
                     Contoh data dummy:{" "}
-                    <code>00000001,Nama Mahasiswa,TI,true,{election.period}</code>. Simpan
-                    sebagai CSV UTF-8. Impor ulang memperbarui nama tanpa menggandakan NIM.
+                    <code>
+                      00000001,Nama Mahasiswa,TI,true,{election.period}
+                    </code>
+                    . Simpan sebagai CSV UTF-8. Impor ulang memperbarui nama
+                    tanpa menggandakan NIM.
                   </p>
                 </details>
                 <label className="admin-voting-file">
@@ -631,7 +750,9 @@ export function VotingManager() {
                   disabled={!draft || !csv || busy}
                   onClick={previewCsv}
                 >
-                  <PendingLabel pending={busy} text="Memeriksa berkas…">Validasi dan preview</PendingLabel>
+                  <PendingLabel pending={busy} text="Memeriksa berkas…">
+                    Validasi dan preview
+                  </PendingLabel>
                 </button>
                 {preview && (
                   <div className="admin-voting-preview">
@@ -675,7 +796,9 @@ export function VotingManager() {
                         }
                       }}
                     >
-                      <PendingLabel pending={busy} text="Mengimpor NIM…">Konfirmasi impor {preview.valid} pemilih</PendingLabel>
+                      <PendingLabel pending={busy} text="Mengimpor NIM…">
+                        Konfirmasi impor {preview.valid} pemilih
+                      </PendingLabel>
                     </button>
                   </div>
                 )}
@@ -783,9 +906,13 @@ export function VotingManager() {
           />
         </EditorDialog>
       )}
-      {modal === "schedule" && (
+      {(modal === "schedule" || modal === "open") && (
         <EditorDialog
-          title="Konfirmasi jadwal pemilihan"
+          title={
+            modal === "open"
+              ? `Buka voting ${election?.period}`
+              : "Konfirmasi jadwal pemilihan"
+          }
           busy={busy}
           onClose={() => setModal(null)}
         >
@@ -793,26 +920,31 @@ export function VotingManager() {
             className="admin-form"
             onSubmit={async (e) => {
               e.preventDefault();
-              const form = payload("schedule");
-              form.set("startsAt", startsAt);
+              const form = payload(modal === "open" ? "open" : "schedule");
+              if (modal === "schedule") form.set("startsAt", startsAt);
               form.set("endsAt", endsAt);
               await mutate(
                 form,
-                "Jadwal pemilihan dikonfirmasi. Kandidat dan NIM terdaftar dikunci.",
+                modal === "open"
+                  ? "Voting dibuka. Suara sebelumnya tetap tersimpan."
+                  : "Jadwal pemilihan dikonfirmasi. Kandidat dan NIM terdaftar dikunci.",
               );
             }}
           >
             <p>
-              Semua waktu dalam WITA (UTC+08:00). Konfirmasi mengunci kandidat,
-              NIM terdaftar dan jadwal. Foto, visi, dan misi wajib diisi;
-              program kerja boleh kosong.
+              {modal === "open"
+                ? "Voting langsung dibuka sampai waktu selesai yang dipilih. Suara sebelumnya tetap tersimpan."
+                : "Voting dibuka sesuai jadwal berikut. Semua waktu dalam WITA (UTC+08:00)."}{" "}
+              Kandidat dan daftar pemilih dikunci setelah dikonfirmasi.
             </p>
-            <DateTimeField
-              label="Mulai (WITA)"
-              value={startsAt}
-              onChange={setStartsAt}
-              disabled={busy}
-            />
+            {modal === "schedule" && (
+              <DateTimeField
+                label="Mulai (WITA)"
+                value={startsAt}
+                onChange={setStartsAt}
+                disabled={busy}
+              />
+            )}
             <DateTimeField
               label="Selesai (WITA)"
               value={endsAt}
@@ -834,14 +966,21 @@ export function VotingManager() {
               disabled={busy}
               type="submit"
             >
-              <PendingLabel pending={busy} text="Menyimpan jadwal…">Konfirmasi dan kunci data</PendingLabel>
+              <PendingLabel
+                pending={busy}
+                text={
+                  modal === "open" ? "Membuka voting…" : "Menyimpan jadwal…"
+                }
+              >
+                {modal === "open" ? "Buka sekarang" : "Konfirmasi jadwal"}
+              </PendingLabel>
             </button>
           </form>
         </EditorDialog>
       )}
       {modal === "close" && (
         <EditorDialog
-          title="Tutup resmi pemilihan"
+          title="Tutup voting"
           busy={busy}
           onClose={() => setModal(null)}
         >
@@ -851,13 +990,14 @@ export function VotingManager() {
               e.preventDefault();
               await mutate(
                 payload("close"),
-                "Pemilihan ditutup. Hasil akhir tersedia hanya di admin.",
+                "Voting ditutup. Suara tetap tersimpan dan voting bisa dibuka kembali.",
               );
             }}
           >
             <p>
-              Tindakan ini menghentikan pemberian suara dan membuka rekap hasil
-              bagi admin. Pemilihan tidak dapat dibuka kembali.
+              Pemilih tidak dapat mengirim suara selama voting ditutup. Suara
+              yang sudah masuk tetap tersimpan. Kamu dapat membuka voting
+              kembali.
             </p>
             <label className="admin-voting-check">
               <input type="checkbox" required disabled={busy} />
@@ -873,7 +1013,63 @@ export function VotingManager() {
               disabled={busy}
               type="submit"
             >
-              <PendingLabel pending={busy} text="Menutup pemilihan…">Konfirmasi tutup pemilihan</PendingLabel>
+              <PendingLabel pending={busy} text="Menutup voting…">
+                Konfirmasi tutup voting
+              </PendingLabel>
+            </button>
+          </form>
+        </EditorDialog>
+      )}
+      {modal === "reset" && election && (
+        <EditorDialog
+          title={`Reset suara ${election.period}`}
+          busy={busy}
+          onClose={() => setModal(null)}
+        >
+          <form
+            className="admin-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const form = payload("reset");
+              form.set("confirmation", resetConfirmation);
+              await mutate(form, "Periode uji direset.");
+            }}
+          >
+            <p id="voting-reset-warning">
+              Reset menghapus {data?.stats?.ballots ?? 0} suara dari rekap aktif
+              dan memulihkan {data?.stats?.consumed ?? 0} hak pilih. Periode
+              kembali ke draft. Kandidat dan daftar pemilih tetap disimpan. Sesi
+              memilih lama dibatalkan dan cadangan dibuat sebelum reset. Gunakan
+              hanya untuk suara percobaan.
+            </p>
+            <label>
+              Ketik RESET {election.period} untuk mengonfirmasi
+              <input
+                value={resetConfirmation}
+                onChange={(event) => setResetConfirmation(event.target.value)}
+                aria-describedby="voting-reset-warning"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={50}
+                required
+                disabled={busy}
+              />
+            </label>
+            {error && (
+              <p className="admin-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button
+              className="admin-button danger"
+              type="submit"
+              disabled={
+                busy || resetConfirmation.trim() !== `RESET ${election.period}`
+              }
+            >
+              <PendingLabel pending={busy} text="Mereset suara…">
+                Reset suara percobaan
+              </PendingLabel>
             </button>
           </form>
         </EditorDialog>
@@ -1080,7 +1276,9 @@ function CandidateEditor({
         disabled={busy}
         type="submit"
       >
-        <PendingLabel pending={busy} text="Menyimpan profil…">Simpan profil kandidat</PendingLabel>
+        <PendingLabel pending={busy} text="Menyimpan profil…">
+          Simpan profil kandidat
+        </PendingLabel>
       </button>
     </form>
   );

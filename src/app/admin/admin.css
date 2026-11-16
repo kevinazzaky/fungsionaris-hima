@@ -329,8 +329,15 @@
   cursor: pointer;
 }
 .admin button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.65;
+}
+.admin button:disabled:has(.pending-label) {
+  cursor: wait;
+}
+.admin-dialog-header > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .admin h1,
 .admin h2,
