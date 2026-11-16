@@ -274,12 +274,6 @@ export function VotingPage({ data: initialData }: { data: VotingPublicData }) {
                             ? `Pemungutan suara dimulai ${schedule(data.election?.startsAt)}.`
                             : "Pemilihan akan segera dibuka. Nantikan jadwal dan informasi selanjutnya."}
                       </p>
-                      {!data.available && (
-                        <p>
-                          Layanan pemungutan suara belum tersedia. Silakan coba
-                          lagi nanti.
-                        </p>
-                      )}
                       <Link
                         className="voting-primary voting-panel-cta"
                         href="/"
