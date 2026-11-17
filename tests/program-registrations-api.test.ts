@@ -839,6 +839,33 @@ test("modul route.ts Next.js mengekspor handler yang tepat dan tidak membuka GET
         const unauthPrograms = await adminProgramsRoute.GET();
         assert.equal(unauthPrograms.status, 401);
 
+        Object.defineProperty(MockAccessError, 'name', { value: 'a' });
+        const unauthRegsGet = await adminRegsRoute.GET(
+          new Request('https://example.com/api/admin/program-registrations'),
+        );
+        assert.equal(unauthRegsGet.status, 401);
+        const unauthRegsPatch = await adminRegIdRoute.PATCH(
+          new Request('https://example.com/api/admin/program-registrations/' + programId, {
+            method: 'PATCH',
+            headers: { origin: 'https://example.com', 'content-type': 'application/json' },
+            body: '{}',
+          }),
+          { params: Promise.resolve({ id: programId }) },
+        );
+        assert.equal(unauthRegsPatch.status, 401);
+        const unauthRegsDelete = await adminRegIdRoute.DELETE(
+          new Request('https://example.com/api/admin/program-registrations/' + programId, {
+            method: 'DELETE',
+            headers: { origin: 'https://example.com' },
+          }),
+          { params: Promise.resolve({ id: programId }) },
+        );
+        assert.equal(unauthRegsDelete.status, 401);
+        const unauthRegsExport = await adminExportRoute.GET(
+          new Request('https://example.com/api/admin/program-registrations/export'),
+        );
+        assert.equal(unauthRegsExport.status, 401);
+
         adminAllowed = true;
         const okPrograms = await adminProgramsRoute.GET();
         assert.equal(okPrograms.status, 200);
@@ -916,6 +943,91 @@ test("modul route.ts Next.js mengekspor handler yang tepat dan tidak membuka GET
           { params: Promise.resolve({ id: 'bad' }) },
         );
         assert.equal(badRegPatch.status, 400);
+      })().catch((err) => { console.error(err); process.exitCode = 1; });
+      `,
+    ],
+    { cwd: process.cwd(), encoding: "utf8", timeout: 20000 },
+  );
+  assert.equal(
+    result.status,
+    0,
+    result.error?.message || result.stderr || result.stdout,
+  );
+});
+
+test("AccessError asli tetap menghasilkan 401 walau constructor.name terminifikasi", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--conditions=react-server",
+      "--import=tsx",
+      "-e",
+      `
+      const assert = require('node:assert/strict');
+      const { AccessError } = require('./src/data/auth.ts');
+      const api = require('./src/lib/program-registrations-api.ts');
+
+      const probe = new AccessError();
+      assert.equal(probe.name, 'AccessError');
+
+      Object.defineProperty(AccessError, 'name', { value: 'a' });
+      const minified = new AccessError();
+      assert.equal(minified.constructor.name, 'a');
+      assert.equal(minified.name, 'AccessError');
+
+      const throwRealAccessError = async () => {
+        throw new AccessError();
+      };
+
+      (async () => {
+        const listRes = await api.handleAdminProgramRegistrationsGet(
+          new Request('https://example.com/api/admin/program-registrations'),
+          {
+            requireAdmin: throwRealAccessError,
+            listProgramRegistrations: async () => [],
+            getProgramRegistrationCounts: async () => ({}),
+            listPrograms: async () => [],
+          },
+        );
+        assert.equal(listRes.status, 401);
+        assert.equal(listRes.headers.get('cache-control'), 'no-store');
+        assert.equal((await listRes.json()).error, minified.message);
+
+        const patchRes = await api.handleAdminProgramRegistrationPatch(
+          new Request('https://example.com/api/admin/program-registrations/11111111-1111-4111-8111-111111111111', {
+            method: 'PATCH',
+            headers: { origin: 'https://example.com', 'content-type': 'application/json' },
+            body: '{}',
+          }),
+          '11111111-1111-4111-8111-111111111111',
+          {
+            requireAdmin: throwRealAccessError,
+            updateProgramRegistration: async () => { throw new Error('unreachable'); },
+          },
+        );
+        assert.equal(patchRes.status, 401);
+
+        const deleteRes = await api.handleAdminProgramRegistrationDelete(
+          new Request('https://example.com/api/admin/program-registrations/11111111-1111-4111-8111-111111111111', {
+            method: 'DELETE',
+            headers: { origin: 'https://example.com' },
+          }),
+          '11111111-1111-4111-8111-111111111111',
+          {
+            requireAdmin: throwRealAccessError,
+            deleteProgramRegistration: async () => { throw new Error('unreachable'); },
+          },
+        );
+        assert.equal(deleteRes.status, 401);
+
+        const exportRes = await api.handleAdminProgramRegistrationsExportGet(
+          new Request('https://example.com/api/admin/program-registrations/export'),
+          {
+            requireAdmin: throwRealAccessError,
+            listProgramRegistrations: async () => [],
+          },
+        );
+        assert.equal(exportRes.status, 401);
       })().catch((err) => { console.error(err); process.exitCode = 1; });
       `,
     ],
