@@ -101,18 +101,24 @@ export async function readJsonBody(
   return parsed as Record<string, unknown>;
 }
 
-function isAccessDenied(error: unknown): error is Error {
+function isAccessDenied(
+  error: unknown,
+  isAccessError?: (error: unknown) => boolean,
+): error is Error {
   return (
     error instanceof Error &&
-    (error.name === "AccessError" || error.constructor.name === "AccessError")
+    (Boolean(isAccessError?.(error)) ||
+      error.name === "AccessError" ||
+      error.constructor.name === "AccessError")
   );
 }
 
 export function handleProgramRegistrationError(
   error: unknown,
   logContext: string,
+  isAccessError?: (error: unknown) => boolean,
 ): Response {
-  if (isAccessDenied(error)) {
+  if (isAccessDenied(error, isAccessError)) {
     return jsonNoStore({ error: error.message }, 401);
   }
   if (error instanceof UnsupportedMediaTypeError) {
@@ -244,6 +250,7 @@ export async function handlePublicProgramRegistrationPost(
 
 export type AdminProgramRegistrationsListDeps = {
   requireAdmin: () => Promise<unknown>;
+  isAccessError?: (error: unknown) => boolean;
   listProgramRegistrations: (
     filter?: ProgramRegistrationListFilter,
   ) => Promise<ProgramRegistrationListItem[]>;
@@ -272,12 +279,14 @@ export async function handleAdminProgramRegistrationsGet(
     return handleProgramRegistrationError(
       error,
       "Admin program registrations list failed:",
+      deps.isAccessError,
     );
   }
 }
 
 export type AdminProgramRegistrationMutationDeps = {
   requireAdmin: () => Promise<unknown>;
+  isAccessError?: (error: unknown) => boolean;
   updateProgramRegistration: (
     id: string,
     data: Record<string, unknown>,
@@ -290,7 +299,7 @@ export async function handleAdminProgramRegistrationPatch(
   idOrPromise: string | Promise<string>,
   deps: Pick<
     AdminProgramRegistrationMutationDeps,
-    "requireAdmin" | "updateProgramRegistration"
+    "requireAdmin" | "isAccessError" | "updateProgramRegistration"
   >,
 ): Promise<Response> {
   try {
@@ -310,6 +319,7 @@ export async function handleAdminProgramRegistrationPatch(
     return handleProgramRegistrationError(
       error,
       "Admin program registration update failed:",
+      deps.isAccessError,
     );
   }
 }
@@ -319,7 +329,7 @@ export async function handleAdminProgramRegistrationDelete(
   idOrPromise: string | Promise<string>,
   deps: Pick<
     AdminProgramRegistrationMutationDeps,
-    "requireAdmin" | "deleteProgramRegistration"
+    "requireAdmin" | "isAccessError" | "deleteProgramRegistration"
   >,
 ): Promise<Response> {
   try {
@@ -334,12 +344,14 @@ export async function handleAdminProgramRegistrationDelete(
     return handleProgramRegistrationError(
       error,
       "Admin program registration delete failed:",
+      deps.isAccessError,
     );
   }
 }
 
 export type AdminProgramRegistrationsExportDeps = {
   requireAdmin: () => Promise<unknown>;
+  isAccessError?: (error: unknown) => boolean;
   listProgramRegistrations: (
     filter?: ProgramRegistrationListFilter,
   ) => Promise<ProgramRegistrationListItem[]>;
@@ -371,6 +383,7 @@ export async function handleAdminProgramRegistrationsExportGet(
     return handleProgramRegistrationError(
       error,
       "Admin program registrations export failed:",
+      deps.isAccessError,
     );
   }
 }

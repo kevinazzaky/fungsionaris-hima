@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/data/auth";
+import { AccessError, requireAdmin } from "@/data/auth";
 import { programRepository } from "@/data/repositories/programs";
 import { programRegistrationRepository } from "@/data/repositories/program-registrations";
 import { handleAdminProgramRegistrationsGet } from "@/lib/program-registrations-api";
@@ -10,6 +10,7 @@ import {
 export async function GET(request: Request) {
   return handleAdminProgramRegistrationsGet(request, {
     requireAdmin,
+    isAccessError: (error) => error instanceof AccessError,
     listProgramRegistrations: (filter) =>
       listProgramRegistrations(programRegistrationRepository, filter),
     getProgramRegistrationCounts: () =>

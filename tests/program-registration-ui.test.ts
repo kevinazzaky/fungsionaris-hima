@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
+import { ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Cake } from "@phosphor-icons/react/dist/ssr";
@@ -207,4 +209,90 @@ test("seluruh file UI publik program pendaftaran bebas dari karakter em dash", (
     const content = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
     assert.equal(content.includes("—"), false, `Em dash found in ${rel}`);
   }
+});
+
+test("generateMetadata halaman daftar proker memanggil notFound() saat program tidak ditemukan atau belum dipublikasikan", async () => {
+  class NotFoundSignal extends Error {
+    digest = "NEXT_HTTP_ERROR_FALLBACK;404";
+  }
+  let mockData: {
+    program: Program | null;
+    registeredCount: number;
+    configured: boolean;
+  } = { program: null, registeredCount: 0, configured: true };
+  const stub = {};
+  const modules: Record<string, unknown> = {
+    react: { cache: (fn: unknown) => fn },
+    "react/jsx-runtime": { jsx: () => null, jsxs: () => null, Fragment: "fragment" },
+    "next/image": stub,
+    "next/navigation": {
+      notFound: () => {
+        throw new NotFoundSignal("notFound");
+      },
+    },
+    "@phosphor-icons/react/dist/ssr": new Proxy({}, { get: () => stub }),
+    "@/components/detail/detail-header": { DetailHeader: stub },
+    "@/components/programs/program-registration-form": {
+      ProgramRegistrationForm: stub,
+    },
+    "@/components/ui/navigation-link": stub,
+    "@/data/programs": {
+      loadProgramRegistrationPage: async () => mockData,
+    },
+    "@/domain/programs": { PROGRAM_STATUSES: {} },
+  };
+  const context = {
+    exports: {} as {
+      generateMetadata: (args: {
+        params: Promise<{ id: string }>;
+      }) => Promise<{ title?: string }>;
+    },
+    require: (name: string) => {
+      assert.ok(Object.hasOwn(modules, name), `Unexpected import: ${name}`);
+      return modules[name];
+    },
+  };
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "src/app/program-kerja/[id]/daftar/page.tsx"),
+    "utf8",
+  );
+  runInNewContext(
+    transpileModule(source, {
+      compilerOptions: {
+        module: ModuleKind.CommonJS,
+        target: ScriptTarget.ES2020,
+        jsx: 4,
+      },
+    }).outputText,
+    context,
+  );
+
+  await assert.rejects(
+    context.exports.generateMetadata({
+      params: Promise.resolve({ id: "missing" }),
+    }),
+    NotFoundSignal,
+  );
+
+  mockData = {
+    program: { ...baseInternalProgram, isPublished: false },
+    registeredCount: 0,
+    configured: true,
+  };
+  await assert.rejects(
+    context.exports.generateMetadata({
+      params: Promise.resolve({ id: "unpublished" }),
+    }),
+    NotFoundSignal,
+  );
+
+  mockData = {
+    program: baseInternalProgram,
+    registeredCount: 0,
+    configured: true,
+  };
+  const meta = await context.exports.generateMetadata({
+    params: Promise.resolve({ id: baseInternalProgram.id }),
+  });
+  assert.match(String(meta.title), /IT Versary & Sertijab 2026/);
 });

@@ -762,6 +762,14 @@ function ProgramEditor({
   const [removeImage, setRemoveImage] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const submitting = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -849,6 +857,17 @@ function ProgramEditor({
         },
       );
       await onSaved(result.item);
+      if (mounted.current) {
+        resetPhoto();
+        setRemoveImage(false);
+        setGformLink(result.item.gformLink);
+        setRegistrationMaxQuota(
+          result.item.registrationMaxQuota != null
+            ? String(result.item.registrationMaxQuota)
+            : "",
+        );
+        setRegistrationGroupLink(result.item.registrationGroupLink);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Program gagal disimpan.");
     } finally {
