@@ -8,14 +8,26 @@ Sumber skema: [prisma/schema.prisma](../prisma/schema.prisma).
 | `Member` | Nama, jabatan, kelompok, foto, urutan, publikasi fungsionaris | UUID; indeks publikasi/kelompok/urutan |
 | `GalleryPhoto` | Judul, deskripsi aksesibel, lokasi foto, urutan, publikasi | UUID; indeks publikasi/urutan |
 | `HeroSlide` | Judul internal, deskripsi aksesibel, path foto hero, urutan, publikasi | UUID; indeks publikasi/urutan; RLS dan akses server seperti konten lain |
-| `Program` | Judul, ringkasan/deskripsi, periode, jadwal, lokasi, status, tautan registrasi, narasumber/benefit, biaya/kontak, ikon, path foto dan publikasi | UUID; enum status; array teks; indeks publikasi/periode/urutan; RLS dan akses server |
+| `Program` | Judul, ringkasan/deskripsi, periode, jadwal, lokasi, status, mode pendaftaran, kuota maksimal, tautan grup/registrasi, narasumber/benefit, biaya/kontak, ikon, path foto dan publikasi | UUID; enum `ProgramStatus` dan `ProgramRegistrationMode`; CHECK `registrationMaxQuota >= 1` atau null; array teks; indeks publikasi/periode/urutan; RLS dan akses server |
 | `ProgramPeriod` | Label periode dan status tampil satu periode | Primary key label kanonis; relasi Program.period, RLS aktif; hapus periode berisi program ditolak FK |
+| `ProgramRegistration` | Data peserta yang mendaftar langsung melalui formulir website program kerja | UUID; FK ke `Program(id)` dengan `ON DELETE RESTRICT`; kombinasi `(programId, nim)` unik; indeks `(programId, submittedAt)`; RLS aktif tanpa akses `anon`/`authenticated` |
 | `RegistrationSettings` | Status buka/tutup penerimaan fungsionaris | Singleton `main` dengan CHECK; hanya flag boolean dan updatedAt; RLS dan akses server |
 | `Registration` | Data pendaftaran dari website dan spreadsheet | Kombinasi NIM + periode unik; sumber `web` atau `spreadsheet` |
 
 `Registration.submittedAt` boleh null untuk tanggal historis yang tidak diketahui. `createdAt` merekam waktu penyimpanan di database; keduanya memiliki arti berbeda. `berkas` adalah nama file, `berkasPath` adalah path object privat, `berkasSize` adalah byte. Impor lama hanya mengisi nama file jika tersedia. Data pribadi tidak diteruskan oleh endpoint publik.
 
 RLS aktif pada seluruh tabel aplikasi. Tidak ada policy baca/tulis untuk `anon` atau `authenticated`, dan grant untuk kedua role serta `PUBLIC` dicabut. Prisma memakai koneksi server dengan role yang bisa mengakses tabel. Setiap handler admin melakukan pemeriksaan Supabase Auth dan `AdminUser` sebelum query. Tidak ada trigger aplikasi; UUID, timestamp, dan keunikan diatur schema Prisma/database.
+
+## Pendaftaran peserta program kerja
+
+Migration `prisma/migrations/20261117000000_program_registrations/migration.sql` menambahkan enum `ProgramRegistrationMode` (`external`, `internal`), kolom baru pada `Program`, serta tabel `ProgramRegistration`:
+
+- `Program.registrationMode`: default `external` agar program lama tetap kompatibel; mode `internal` mengarahkan pendaftar ke halaman `/program-kerja/[id]/daftar`.
+- `Program.registrationGroupLink`: string URL grup peserta (default `""`); disaring pada pembacaan publik pra-pendaftaran (`loadPrograms`, `loadProgramRegistrationPage`) dan hanya dikembalikan setelah submit pendaftaran berhasil.
+- `Program.registrationMaxQuota`: integer opsional (`null` berarti tanpa batas); constraint `Program_registrationMaxQuota_check` memastikan nilainya minimal `1` bila diisi.
+- `ProgramRegistration`: menyimpan `id`, `programId`, `nama`, `nim`, `angkatan`, `noHp`, `idLine`, `email`, `catatan`, `submittedAt`, dan `createdAt`. Kombinasi `(programId, nim)` unik sehingga satu NIM dapat mendaftar pada beberapa program berbeda tetapi hanya satu kali per program. Relasi `programId` memakai `ON DELETE RESTRICT` sehingga program yang sudah memiliki pendaftar tidak dapat dihapus sebelum data pesertanya ditangani.
+- Transaksi atomik: saat pendaftaran dikirim, repository mengunci baris `Program` memakai `SELECT ... FOR UPDATE OF p` untuk memastikan status publikasi program/periode, mode `internal`, status `open`, dan batas `registrationMaxQuota` tetap konsisten terhadap permintaan bersamaan.
+- Keamanan SQL: RLS diaktifkan pada `ProgramRegistration` dan seluruh hak akses `anon`, `authenticated`, serta `PUBLIC` dicabut (`REVOKE ALL`).
 
 ## Pemetaan header spreadsheet
 
