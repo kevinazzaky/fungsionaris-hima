@@ -10,17 +10,17 @@ Gunakan project Supabase/PostgreSQL staging yang terpisah untuk seluruh pengujia
 
 ## 2. Verifikasi otomatis dan PGlite
 
-Pada audit cabang `feat/pendaftaran-proker` tanggal 17 November 2026, pemeriksaan berikut berjalan dengan hasil lulus:
+Pada verifikasi pasca-perbaikan cabang `feat/pendaftaran-proker` (commit `20b47b1`, 17 November 2026), pemeriksaan berikut berjalan dengan hasil lulus:
 
 | Pemeriksaan | Hasil | Cakupan |
 | --- | --- | --- |
 | `npm run db:validate` dan `npm run db:generate` | Lulus | Validasi skema `prisma/schema.prisma` dan generasi Prisma Client |
 | `npx next typegen` dan `npx tsc --noEmit` | Lulus | Pemeriksaan tipe Next.js dan TypeScript |
 | `npm run lint` | Lulus | Pemeriksaan ESLint |
-| `npm run build` | Lulus | Build produksi (kondisi default dan env DB/Supabase kosong: 38 halaman statis beserta route dinamis) |
-| `npm test` | Lulus (`143/143`) | Validasi domain/use case (`tests/program-registrations.test.ts`, `tests/programs.test.ts`), API/ekspor `.xlsx` (`tests/program-registrations-api.test.ts`), komponen UI (`tests/program-registration-ui.test.ts`, `tests/admin-program-registrations-ui.test.ts`), serta SQL PGlite (`tests/database.test.ts`) |
+| `npm run build` | Lulus | Build produksi (`.env.local` default, env backend kosong, dan env placeholder belum dikonfigurasi: `38/38` halaman statis beserta route dinamis) |
+| `npm test` | Lulus (`145/145`) | Validasi domain/use case (`tests/program-registrations.test.ts`, `tests/programs.test.ts`), API/ekspor `.xlsx` (`tests/program-registrations-api.test.ts`), komponen UI (`tests/program-registration-ui.test.ts`, `tests/admin-program-registrations-ui.test.ts`), serta SQL PGlite (`tests/database.test.ts`; `0` gagal, `0` dilewati) |
 | Uji SQL PGlite `FOR UPDATE OF p` | Lulus | Verifikasi sintaks penguncian baris program dalam transaksi pada engine PGlite |
-| Smoke test `next start` (tanpa env backend) | Lulus | `/` (`200`), `/program-kerja` (`200`), `/program-kerja/program-2025-2026-4/daftar` (`200`), `/api/admin/programs` (`401`), `GET /api/program-registrations` (`405`), `POST` cross-origin (`403`), `POST` same-origin (`503`) |
+| Smoke test `next start` (env placeholder belum dikonfigurasi) | Lulus | `GET /` (`200`), `GET /program-kerja` (`200`), `GET /program-kerja/program-2025-2026-4/daftar` (`200`, `Layanan Pendaftaran Belum Aktif` tanpa `registrationGroupLink`), `GET /program-kerja/does-not-exist/daftar` (`200` dengan `noindex`), `GET /api/admin/programs` (`401`), `GET /api/admin/program-registrations` (`401`, `no-store`), `PATCH`/`DELETE /api/admin/program-registrations/<uuid>` (`401`, `no-store`), `GET /api/admin/program-registrations/export` (`401`, `no-store`), `GET /api/program-registrations` (`405`), `POST /api/program-registrations` cross-origin (`403`), same-origin (`503`) |
 
 Rincian verifikasi migrasi dan RLS pada `tests/database.test.ts` terhadap `prisma/migrations/20261117000000_program_registrations/migration.sql`:
 
@@ -30,14 +30,14 @@ Rincian verifikasi migrasi dan RLS pada `tests/database.test.ts` terhadap `prism
 - Indeks unik `(programId, nim)` menolak NIM ganda pada program yang sama, namun mengizinkan NIM yang sama mendaftar pada program kerja berbeda.
 - Foreign key `ProgramRegistration_programId_fkey` memakai `ON DELETE RESTRICT`, sehingga penghapusan `Program` yang masih memiliki peserta ditolak database.
 
-### Temuan audit dan batas pengujian yang perlu dicek ulang
+### Status temuan audit dan sisa pengujian manual
 
-Audit kode dan `next start` pada 17 November 2026 mencatat tiga temuan yang wajib diverifikasi ulang setelah perbaikannya digabungkan, ditambah batas pengujian lingkungan nyata:
+Verifikasi pasca-perbaikan pada commit `20b47b1` (17 November 2026) memastikan ketiga temuan audit sebelumnya sudah terselesaikan, sedangkan pengujian pada PostgreSQL staging dan browser terautentikasi tetap perlu dijalankan manual sebelum rilis:
 
-1. **Respon 401 endpoint admin baru pada `next start` produksi**: tanpa perbaikan nama error `AccessError` di `src/data/auth.ts` atau pemeriksaan `instanceof AccessError`, build produksi yang terminifikasi mengembalikan HTTP `500` alih-alih `401` pada `/api/admin/program-registrations`, `/api/admin/program-registrations/[id]`, dan `/api/admin/program-registrations/export`. Pastikan seluruh endpoint ini mengembalikan `401` saat tidak terautentikasi pada build `next start` final.
-2. **Status HTTP ID tidak ditemukan pada `/program-kerja/[id]/daftar`**: permintaan ke ID yang tidak ada menampilkan judul tidak ditemukan dan tag `noindex`, namun dapat tetap mengirim HTTP `200` pada streaming respons dinamis. Pastikan `generateMetadata` memanggil `notFound()` saat program tidak ditemukan atau belum dipublikasikan.
-3. **Pratinjau foto saat dialog editor program tetap terbuka**: saat mengubah program dari `external` ke `internal` sekaligus mengunggah foto baru di `src/components/admin/programs-manager.tsx`, pastikan state pratinjau file sementara (`"(belum disimpan)"`) dibersihkan setelah simpan berhasil.
-4. **Cakupan PostgreSQL nyata dan browser terautentikasi**: PGlite berjalan dalam satu proses/engine dan tidak menggantikan uji multi-koneksi transaksi `FOR UPDATE OF p` di PostgreSQL sungguhan. Alur submit publik, login admin, tab **Peserta proker**, edit/hapus peserta, dan unduh file `.xlsx` di browser perlu diverifikasi pada database staging yang sudah dimigrasi.
+1. **Selesai: Respon 401 endpoint admin baru pada `next start` produksi**: `src/data/auth.ts` menetapkan nama `AccessError` dan route handler untuk `/api/admin/program-registrations`, `/api/admin/program-registrations/[id]`, serta `/api/admin/program-registrations/export` memeriksa `isAccessError`. Pada build `next start` commit `20b47b1`, permintaan tanpa sesi ke `GET /api/admin/program-registrations`, `PATCH`/`DELETE /api/admin/program-registrations/<uuid>`, dan `GET /api/admin/program-registrations/export` seluruhnya mengembalikan HTTP `401` (`no-store`).
+2. **Selesai: Penanganan ID tidak ditemukan pada `/program-kerja/[id]/daftar`**: `generateMetadata` pada `/program-kerja/[id]/daftar` memanggil `notFound()` saat program tidak ditemukan atau belum dipublikasikan. Karena `RootLayout` memakai streaming setelah `await headers()`, `GET /program-kerja/does-not-exist/daftar` pada `next start` (`20b47b1`) tetap mengirim HTTP `200` disertai tag `noindex` (terverifikasi untuk User-Agent default dan `Twitterbot/1.0`).
+3. **Selesai: Pratinjau foto saat dialog editor program tetap terbuka**: perbaikan pembersihan state pratinjau file sementara pada `src/components/admin/programs-manager.tsx` sudah digabungkan pada commit `20b47b1`, dan seluruh `145/145` tes otomatis lolos (`0` gagal, `0` dilewati). Pengujian interaktif langsung tetap masuk cek browser admin terautentikasi.
+4. **Sisa cakupan manual (PostgreSQL nyata dan browser terautentikasi)**: PGlite berjalan dalam satu proses/engine dan tidak menggantikan uji multi-koneksi transaksi `FOR UPDATE OF p` di PostgreSQL sungguhan. Alur submit publik, login admin, tab **Peserta proker**, edit/hapus peserta, dan unduh file `.xlsx` di browser perlu diverifikasi manual pada database staging yang sudah dimigrasi.
 
 ## 3. Checklist migrasi manual (staging ke produksi)
 
@@ -82,4 +82,4 @@ Jalankan seluruh skenario berikut pada lingkungan staging:
 - [ ] Uji batas kuota (misalnya atur kuota `1` di staging, kirim pendaftar pertama lalu pendaftar kedua): pendaftar kedua ditolak `409`, dan muat ulang halaman menampilkan status **Kuota Peserta Penuh** tanpa formulir.
 - [ ] Uji status `Segera Hadir`, `Pendaftaran Ditutup`, dan mode `Tautan Eksternal`: halaman `/program-kerja/<id]/daftar` hanya menampilkan kartu informasi status yang sesuai tanpa `<form>`.
 - [ ] Buka `/admin/program-kerja`, pastikan badge `Formulir Website` dan jumlah peserta (`N peserta` atau `N / M peserta`) tampil pada baris program, klik **Lihat peserta**, lalu uji filter program, pencarian, **Detail & Edit**, **Hapus** dengan konfirmasi, serta **Unduh Excel (.xlsx)** (sheet `Peserta Program`, timestamp WITA, dan awalan `=`/`+`/`-`/`@` dinetralkan).
-- [ ] Uji permintaan anonim ke `/api/admin/program-registrations`, `/api/admin/program-registrations/<id>`, dan `/api/admin/program-registrations/export` pada `next start`: semuanya mengembalikan HTTP `401`.
+- [x] Uji permintaan anonim ke `/api/admin/program-registrations`, `/api/admin/program-registrations/<uuid>` (`PATCH`/`DELETE`), dan `/api/admin/program-registrations/export` pada `next start`: semuanya mengembalikan HTTP `401` (`no-store`, terverifikasi pada commit `20b47b1`).
