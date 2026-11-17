@@ -103,29 +103,57 @@ enum ProgramStatus {
   closed
 }
 
+enum ProgramRegistrationMode {
+  external
+  internal
+}
+
 model Program {
-  programPeriod ProgramPeriod @relation(fields: [period], references: [period], onDelete: Restrict, onUpdate: Cascade)
-  id String @id @default(uuid()) @db.Uuid
-  title String
-  body String
-  fullDescription String @default("")
-  period String
-  executionDate String @default("")
-  time String @default("")
-  location String @default("")
-  status ProgramStatus @default(upcoming)
-  icon String @default("code")
-  gformLink String @default("")
-  speakers String[] @default([])
-  benefits String[] @default([])
-  price String @default("")
-  contactPerson String @default("")
-  imagePath String?
-  sortOrder Int @default(0)
-  isPublished Boolean @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  programPeriod         ProgramPeriod           @relation(fields: [period], references: [period], onDelete: Restrict, onUpdate: Cascade)
+  id                    String                  @id @default(uuid()) @db.Uuid
+  title                 String
+  body                  String
+  fullDescription       String                  @default("")
+  period                String
+  executionDate         String                  @default("")
+  time                  String                  @default("")
+  location              String                  @default("")
+  status                ProgramStatus           @default(upcoming)
+  icon                  String                  @default("code")
+  gformLink             String                  @default("")
+  registrationMode      ProgramRegistrationMode @default(external)
+  registrationGroupLink String                  @default("")
+  registrationMaxQuota  Int?
+  speakers              String[]                @default([])
+  benefits              String[]                @default([])
+  price                 String                  @default("")
+  contactPerson         String                  @default("")
+  imagePath             String?
+  sortOrder             Int                     @default(0)
+  isPublished           Boolean                 @default(true)
+  createdAt             DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(3)
+  registrations         ProgramRegistration[]
+
   @@index([isPublished, period, sortOrder])
+}
+
+model ProgramRegistration {
+  id          String   @id @default(uuid()) @db.Uuid
+  programId   String   @db.Uuid
+  nama        String
+  nim         String
+  angkatan    String
+  noHp        String   @default("")
+  idLine      String   @default("")
+  email       String   @default("")
+  catatan     String   @default("")
+  submittedAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  @@unique([programId, nim])
+  @@index([programId, submittedAt])
 }
 
 model ProgramPeriod {
