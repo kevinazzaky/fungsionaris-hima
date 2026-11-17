@@ -6,7 +6,7 @@ import { votingReady } from "@/data/voting";
 import { votingRepository } from "@/data/repositories/voting";
 import { normalizeNim, electionState } from "@/domain/voting";
 import { ValidationError } from "@/domain/admin";
-import { loadVotingSubmissionStatus, prepareVotingSession, VotingCheckLimitError } from "@/use-cases/voting";
+import { loadVotingSubmissionStatus, prepareVotingAccess, VotingCheckLimitError } from "@/use-cases/voting";
 import { readVotingToken, voterKey } from "@/use-cases/voting-token";
 
 export function votingJson(data: unknown, status = 200) {
@@ -63,7 +63,7 @@ export async function publicVotingRequest(
       const key = voterKey(nim, election.id, secret);
       const checkAllowed = await votingRepository.rate(`nim:${key}`, "nim", 5);
       return votingJson(
-        await prepareVotingSession(votingRepository, nim, election.id, secret, input.name, Date.now(), checkAllowed),
+        await prepareVotingAccess(votingRepository, election, nim, secret, input.name, Date.now(), checkAllowed),
       );
     }
     const token = readVotingToken(input.token, secret);

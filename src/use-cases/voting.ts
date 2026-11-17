@@ -1,8 +1,23 @@
-import { normalizeNim, normalizeVoterName } from "../domain/voting";
+import { normalizeNim, normalizeVoterName, electionState, type VotingElection } from "../domain/voting";
 import { ValidationError } from "../domain/admin";
 import { issueVotingToken, readVotingToken, voterKey } from "./voting-token";
 
 export class VotingCheckLimitError extends ValidationError {}
+
+export async function prepareVotingAccess(
+  repository: Parameters<typeof prepareVotingSession>[0],
+  election: VotingElection,
+  nim: unknown,
+  secret: string,
+  name: unknown,
+  now = Date.now(),
+  checkAllowed = true,
+) {
+  if (electionState(election, new Date(now)) !== "open")
+    throw new ValidationError("Pemungutan suara sedang tidak dibuka.");
+  const session = await prepareVotingSession(repository, nim, election.id, secret, name, now, checkAllowed);
+  return { ...session, election, expiresAt: readVotingToken(session.token, secret, now).expires };
+}
 
 export async function loadVotingSubmissionStatus(
   repository: { voterEligibility: (id: string, key: string) => Promise<{ consumed: boolean; tokenVersion?: number } | null> },

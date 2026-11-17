@@ -31,6 +31,24 @@ export type VotingPublicData = {
   available: boolean;
   error?: string;
 };
+
+export function votingOverview(election: VotingElection | null): VotingElection | null {
+  if (!election) return null;
+  return {
+    id: election.id, period: election.period, status: election.status,
+    startsAt: election.startsAt, endsAt: election.endsAt, candidates: [],
+  };
+}
+
+export function votingSessionActive(
+  data: VotingPublicData,
+  session: { electionId: string; expiresAt: number } | null,
+  now = Date.now(),
+) {
+  return !!(data.available && data.election && session &&
+    session.electionId === data.election.id && session.expiresAt > now &&
+    electionState(data.election, new Date(now)) === "open");
+}
 export const NIM_ONLY_WARNING =
   "Nama dan NIM bukan bukti identitas. Orang yang mengetahui pasangan nama dan NIM mahasiswa lain dapat menyalahgunakan hak pilihnya.";
 
