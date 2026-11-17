@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/data/auth";
 import { programRepository } from "@/data/repositories/programs";
 import { programPeriodRepository } from "@/data/repositories/program-periods";
+import { programRegistrationRepository } from "@/data/repositories/program-registrations";
 import { uploadImage, removeFile } from "@/data/supabase/storage";
 import { MEDIA_BUCKET } from "@/lib/backend-config";
 import {
@@ -10,6 +11,8 @@ import {
   readForm,
   readJson,
 } from "@/lib/api-response";
+import { normalizeAdminProgramPayload } from "@/lib/program-registrations-api";
+import { getProgramRegistrationCounts } from "@/use-cases/manage-program-registrations";
 import { saveProgram, deleteProgram } from "@/use-cases/manage-programs";
 import { ValidationError } from "@/domain/admin";
 
@@ -20,11 +23,15 @@ const storage = {
 export async function GET() {
   try {
     await requireAdmin();
-    const [items, periods] = await Promise.all([
+    const [items, periods, counts] = await Promise.all([
       programRepository.list(),
       programPeriodRepository.list(),
+      getProgramRegistrationCounts(programRegistrationRepository),
     ]);
-    return Response.json({ items, periods });
+    return Response.json(
+      { items, periods, counts },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     return apiError(error);
   }
@@ -46,7 +53,7 @@ async function save(request: Request, edit: boolean) {
     const item = await saveProgram(
       programRepository,
       storage,
-      data as Record<string, unknown>,
+      normalizeAdminProgramPayload(data as Record<string, unknown>, form),
       id,
       file instanceof File && file.size ? file : undefined,
       form.get("removeImage") === "true",
