@@ -7,43 +7,70 @@ import {
   PROGRAM_STATUSES,
   type Program,
   type ProgramPeriod,
+  type ProgramRegistrationMode,
 } from "@/domain/programs";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
 import { PendingLabel } from "@/components/ui/pending-label";
+import { ProgramRegistrationsManager } from "./program-registrations-manager";
 
-export function ProgramsManager() {
+export type ProgramsManagerTab = "programs" | "registrations";
+
+const sectionTabs: { id: ProgramsManagerTab; label: string }[] = [
+  { id: "programs", label: "Daftar program" },
+  { id: "registrations", label: "Peserta proker" },
+];
+
+export function ProgramsManager({
+  initialTab = "programs",
+  initialProgramId = "",
+}: {
+  initialTab?: ProgramsManagerTab;
+  initialProgramId?: string;
+}) {
   const inFlight = useRef(false);
+  const sectionTabButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const registrationsPanel = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<ProgramsManagerTab>(initialTab);
+  const [participantProgramId, setParticipantProgramId] =
+    useState(initialProgramId);
+  const [registrationsBusy, setRegistrationsBusy] = useState(false);
+
   const [items, setItems] = useState<Program[]>([]);
   const [periods, setPeriods] = useState<ProgramPeriod[]>([]);
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [addingPeriod, setAddingPeriod] = useState(false);
   const [periodError, setPeriodError] = useState("");
   const periodButtons = useRef<(HTMLButtonElement | null)[]>([]);
-  const [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false);
-  const [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
-  const [search, setSearch] = useState(""),
-    [period, setPeriod] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState("");
   const [editing, setEditing] = useState<Program | "new" | null>(null);
+  const [savedDialogNotice, setSavedDialogNotice] = useState("");
+
   const load = useCallback(
     (signal?: AbortSignal) =>
-      requestJson<{ items: Program[]; periods: ProgramPeriod[] }>(
-        "/api/admin/programs",
-        { signal },
-      )
+      requestJson<{
+        items: Program[];
+        periods: ProgramPeriod[];
+        counts?: Record<string, number>;
+      }>("/api/admin/programs", { signal })
         .then((result) => {
           if (!signal?.aborted) {
             setItems(result.items);
             setPeriods(result.periods);
+            setCounts(result.counts ?? null);
             setError("");
           }
         })
-        .catch((error: unknown) => {
+        .catch((err: unknown) => {
           if (!signal?.aborted)
             setError(
-              error instanceof Error
-                ? error.message
+              err instanceof Error
+                ? err.message
                 : "Program kerja tidak dapat dimuat.",
             );
         })
@@ -52,11 +79,59 @@ export function ProgramsManager() {
         }),
     [],
   );
+
+  function syncUrl(tab: ProgramsManagerTab, programIdValue: string) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (tab === "registrations") {
+      url.searchParams.set("tab", "peserta");
+      if (programIdValue) url.searchParams.set("programId", programIdValue);
+      else url.searchParams.delete("programId");
+    } else {
+      url.searchParams.delete("tab");
+      url.searchParams.delete("programId");
+    }
+    window.history.replaceState(null, "", url);
+  }
+
+  function selectSectionTab(
+    nextTab: ProgramsManagerTab,
+    options?: {
+      programId?: string;
+      focusTab?: boolean;
+      focusPanel?: boolean;
+    },
+  ) {
+    if (busy || registrationsBusy || editing || addingPeriod) return;
+    const nextProgramId =
+      options?.programId !== undefined
+        ? options.programId
+        : participantProgramId;
+    setActiveTab(nextTab);
+    setParticipantProgramId(nextProgramId);
+    syncUrl(nextTab, nextProgramId);
+    if (nextTab === "programs") {
+      void load();
+    }
+    if (options?.focusTab) {
+      const index = sectionTabs.findIndex((tab) => tab.id === nextTab);
+      if (index >= 0) sectionTabButtons.current[index]?.focus();
+    } else if (options?.focusPanel && nextTab === "registrations") {
+      requestAnimationFrame(() => registrationsPanel.current?.focus());
+    }
+  }
+
+  function handleParticipantProgramChange(nextProgramId: string) {
+    setParticipantProgramId(nextProgramId);
+    syncUrl("registrations", nextProgramId);
+  }
+
   const currentPeriod =
     periods.find((item) => item.period === period) || periods[0];
   const periodItems = items.filter(
     (item) => item.period === currentPeriod?.period,
   );
+
   async function createPeriod(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || inFlight.current) return;
@@ -81,15 +156,16 @@ export function ProgramsManager() {
       setBusy(false);
       setAddingPeriod(false);
       setNotice("Periode berhasil ditambahkan.");
-    } catch (error) {
+    } catch (err) {
       setPeriodError(
-        error instanceof Error ? error.message : "Periode gagal ditambahkan.",
+        err instanceof Error ? err.message : "Periode gagal ditambahkan.",
       );
     } finally {
       setBusy(false);
       inFlight.current = false;
     }
   }
+
   async function togglePeriod() {
     if (!currentPeriod || busy || inFlight.current) return;
     inFlight.current = true;
@@ -111,25 +187,26 @@ export function ProgramsManager() {
           ? `Periode ${currentPeriod.period} disembunyikan dari website.`
           : `Periode ${currentPeriod.period} ditampilkan di website.`,
       );
-    } catch (error) {
+    } catch (err) {
       setError(
-        error instanceof Error
-          ? error.message
-          : "Status periode gagal disimpan.",
+        err instanceof Error ? err.message : "Status periode gagal disimpan.",
       );
     } finally {
       setBusy(false);
       inFlight.current = false;
     }
   }
+
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+
   async function remove(item: Program) {
     if (
-      busy || inFlight.current ||
+      busy ||
+      inFlight.current ||
       !window.confirm(
         `Hapus program ${item.title} periode ${item.period}? Data dan foto program akan dihapus permanen.`,
       )
@@ -145,18 +222,20 @@ export function ProgramsManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id }),
       });
-      if (editing !== "new" && editing?.id === item.id) setEditing(null);
+      if (editing !== "new" && editing?.id === item.id) {
+        setEditing(null);
+        setSavedDialogNotice("");
+      }
       setNotice("Program kerja berhasil dihapus.");
       await load();
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Program gagal dihapus.",
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Program gagal dihapus.");
     } finally {
       setBusy(false);
       inFlight.current = false;
     }
   }
+
   const filtered = items.filter(
     (item) =>
       item.period === currentPeriod?.period &&
@@ -164,285 +243,441 @@ export function ProgramsManager() {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+
   return (
     <>
-      <header className="admin-page-header">
-        <div>
-          <h1>Program kerja</h1>
-          <p>
-            Kelola program, jadwal, pendaftaran dan foto yang tampil di website.
-          </p>
-        </div>
-        <div className="admin-actions">
-          <button
-            className="admin-button"
-            disabled={busy}
-            onClick={() => {
-              setAddingPeriod(true);
-              setPeriodError("");
-              setNotice("");
-            }}
-          >
-            Tambah periode
-          </button>
-          <button
-            type="button"
-            className="admin-button primary"
-            disabled={busy}
-            onClick={() => {
-              setEditing("new");
-              setNotice("");
-            }}
-          >
-            Tambah program
-          </button>
-        </div>
-      </header>
-      {busy && !editing && !addingPeriod && <p role="status"><PendingLabel pending text="Memproses perubahan…">Memproses perubahan</PendingLabel></p>}
-      {notice && (
-        <p className="admin-success" role="status">
-          {notice}
-        </p>
-      )}
-      {error && (
-        <div className="admin-error" role="alert">
-          <p>{error}</p>
-          <button
-            className="admin-button"
-            disabled={busy}
-            onClick={() => {
-              setLoading(true);
-              void load();
-            }}
-          >
-            <PendingLabel pending={loading} text="Memuat data…">Muat ulang</PendingLabel>
-          </button>
-        </div>
-      )}
-      {editing && (
-        <EditorDialog
-          busy={busy}
-          onClose={() => setEditing(null)}
-          title={
-            editing === "new" ? "Tambah program kerja" : "Edit program kerja"
-          }
-        >
-          <ProgramEditor
-            key={editing === "new" ? "new" : editing.id}
-            item={editing === "new" ? null : editing}
-            initialPeriod={currentPeriod?.period || ""}
-            onBusy={setBusy}
-            onCancel={() => setEditing(null)}
-            onSaved={async (item) => {
-              await load();
-              setPeriod(item.period);
-              setBusy(false);
-              setEditing(null);
-              setNotice("Program kerja berhasil disimpan.");
-            }}
-          />
-        </EditorDialog>
-      )}
-      {addingPeriod && (
-        <EditorDialog
-          title="Tambah periode program kerja"
-          busy={busy}
-          onClose={() => setAddingPeriod(false)}
-        >
-          <form className="admin-form" onSubmit={createPeriod}>
-            <fieldset disabled={busy}>
-              <label>
-                Periode baru
-                <input
-                  name="period"
-                  required
-                  maxLength={20}
-                  placeholder="2026/2027"
-                />
-                <small>Contoh: 2026/2027 atau 2027.</small>
-              </label>
-              <label className="admin-check">
-                <input type="checkbox" name="isPublished" defaultChecked />
-                Tampilkan periode di website
-              </label>
-              {periodError && (
-                <p role="alert" className="admin-error">
-                  {periodError}
-                </p>
-              )}
-              <div className="admin-actions">
-                <button type="submit" className="admin-button primary">
-                  <PendingLabel pending={busy} text="Menyimpan periode…">Simpan periode</PendingLabel>
-                </button>
-                <button
-                  type="button"
-                  className="admin-button"
-                  onClick={() => setAddingPeriod(false)}
-                >
-                  Batal
-                </button>
-              </div>
-            </fieldset>
-          </form>
-        </EditorDialog>
-      )}
-      {!!periods.length && (
-        <div
-          className="admin-media-tabs"
-          role="tablist"
-          aria-label="Periode program kerja"
-        >
-          {periods.map((item, index) => (
-            <button
-              key={item.period}
-              ref={(node) => {
-                periodButtons.current[index] = node;
-              }}
-              type="button"
-              role="tab"
-              className="admin-button"
-              id={`program-period-${item.period.replaceAll("/", "-")}`}
-              aria-controls="program-period-panel"
-              aria-selected={currentPeriod?.period === item.period}
-              tabIndex={currentPeriod?.period === item.period ? 0 : -1}
-              disabled={busy}
-              onClick={() => setPeriod(item.period)}
-              onKeyDown={(event) => {
-                let next: number;
-                if (event.key === "ArrowRight")
-                  next = (index + 1) % periods.length;
-                else if (event.key === "ArrowLeft")
-                  next = (index + periods.length - 1) % periods.length;
-                else if (event.key === "Home") next = 0;
-                else if (event.key === "End") next = periods.length - 1;
-                else return;
-                event.preventDefault();
-                setPeriod(periods[next].period);
-                periodButtons.current[next]?.focus();
-              }}
-            >
-              {item.period}
-            </button>
-          ))}
-        </div>
-      )}
       <div
-        role={currentPeriod ? "tabpanel" : undefined}
-        id="program-period-panel"
-        aria-labelledby={
-          currentPeriod
-            ? `program-period-${currentPeriod.period.replaceAll("/", "-")}`
-            : undefined
-        }
-        tabIndex={currentPeriod ? 0 : undefined}
+        className="admin-media-tabs"
+        role="tablist"
+        aria-label="Pengelolaan program kerja"
       >
-        {currentPeriod && (
-          <div className="admin-period-summary">
-            <div>
-              <h2>Periode {currentPeriod.period}</h2>
-              <p className="admin-meta">
-                {currentPeriod.isPublished
-                  ? "Periode ditampilkan di website"
-                  : "Periode disembunyikan dari website"}
-              </p>
-              <p className="admin-meta">
-                Periode muncul jika ada program yang dipublikasikan. Status tiap
-                program tetap tersimpan saat periode disembunyikan.
-              </p>
-            </div>
+        {sectionTabs.map((tab, index) => (
+          <button
+            key={tab.id}
+            ref={(node) => {
+              sectionTabButtons.current[index] = node;
+            }}
+            type="button"
+            role="tab"
+            className="admin-button"
+            id={`programs-tab-${tab.id}`}
+            aria-controls={`programs-panel-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            disabled={busy || registrationsBusy}
+            onClick={() => selectSectionTab(tab.id)}
+            onKeyDown={(event) => {
+              let next: number;
+              if (event.key === "ArrowRight")
+                next = (index + 1) % sectionTabs.length;
+              else if (event.key === "ArrowLeft")
+                next = (index + sectionTabs.length - 1) % sectionTabs.length;
+              else if (event.key === "Home") next = 0;
+              else if (event.key === "End") next = sectionTabs.length - 1;
+              else return;
+              event.preventDefault();
+              selectSectionTab(sectionTabs[next].id, { focusTab: true });
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="programs-panel-programs"
+        aria-labelledby="programs-tab-programs"
+        hidden={activeTab !== "programs"}
+        tabIndex={0}
+      >
+        <header className="admin-page-header">
+          <div>
+            <h1>Program kerja</h1>
+            <p>
+              Kelola program, jadwal, mode pendaftaran, dan foto yang tampil di
+              website.
+            </p>
+          </div>
+          <div className="admin-actions">
             <button
+              type="button"
               className="admin-button"
               disabled={busy}
-              onClick={() => void togglePeriod()}
+              onClick={() => {
+                setAddingPeriod(true);
+                setPeriodError("");
+                setNotice("");
+              }}
             >
-              {currentPeriod.isPublished
-                ? "Sembunyikan periode"
-                : "Tampilkan periode"}
+              Tambah periode
+            </button>
+            <button
+              type="button"
+              className="admin-button primary"
+              disabled={busy}
+              onClick={() => {
+                setSavedDialogNotice("");
+                setEditing("new");
+                setNotice("");
+              }}
+            >
+              Tambah program
+            </button>
+          </div>
+        </header>
+        {busy && !editing && !addingPeriod && (
+          <p role="status">
+            <PendingLabel pending text="Memproses perubahan…">
+              Memproses perubahan
+            </PendingLabel>
+          </p>
+        )}
+        {notice && (
+          <p className="admin-success" role="status">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <div className="admin-error" role="alert">
+            <p>{error}</p>
+            <button
+              type="button"
+              className="admin-button"
+              disabled={busy}
+              onClick={() => {
+                setLoading(true);
+                void load();
+              }}
+            >
+              <PendingLabel pending={loading} text="Memuat data…">
+                Muat ulang
+              </PendingLabel>
             </button>
           </div>
         )}
-        <div className="admin-toolbar">
-          <label>
-            Cari program
-            <input
-              type="search"
-              value={search}
-              maxLength={150}
-              onChange={(event) => setSearch(event.target.value)}
+        {editing && (
+          <EditorDialog
+            busy={busy}
+            onClose={() => {
+              setEditing(null);
+              setSavedDialogNotice("");
+            }}
+            title={
+              editing === "new" ? "Tambah program kerja" : "Edit program kerja"
+            }
+          >
+            <ProgramEditor
+              key={editing === "new" ? "new" : editing.id}
+              item={editing === "new" ? null : editing}
+              initialPeriod={currentPeriod?.period || ""}
+              savedNotice={savedDialogNotice}
+              onBusy={setBusy}
+              onCancel={() => {
+                setEditing(null);
+                setSavedDialogNotice("");
+              }}
+              onSaved={async (savedItem) => {
+                const showLinkInDialog =
+                  savedItem.registrationMode === "internal" &&
+                  (editing === "new" ||
+                    editing.registrationMode !== "internal");
+                await load();
+                setPeriod(savedItem.period);
+                setBusy(false);
+                if (showLinkInDialog) {
+                  setEditing(savedItem);
+                  setSavedDialogNotice(
+                    "Program kerja berhasil disimpan. Gunakan tautan pendaftaran publik di bawah ini.",
+                  );
+                } else {
+                  setEditing(null);
+                  setSavedDialogNotice("");
+                  setNotice("Program kerja berhasil disimpan.");
+                }
+              }}
             />
-          </label>
-          <p>
-            {periodItems.length} program
-            {currentPeriod ? ` dalam periode ${currentPeriod.period}` : ""}
-          </p>
-        </div>
-        {loading ? (
-          <p className="admin-notice" role="status">
-            Memuat program kerja...
-          </p>
-        ) : error && items.length === 0 ? null : !filtered.length ? (
-          <div className="admin-empty">
-            <h2>
-              {search ? "Program tidak ditemukan" : "Belum ada program kerja"}
-            </h2>
-            <p>
-              {search
-                ? "Coba kata kunci lain."
-                : "Gunakan Tambah program untuk membuat program pertama."}
-            </p>
-          </div>
-        ) : (
-          <div className="admin-list">
-            {filtered.map((item) => (
-              <article className="admin-content-row" key={item.id}>
-                <div className="admin-thumb">
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.title}
-                      fill
-                      sizes="76px"
-                    />
-                  ) : (
-                    <span className="admin-meta">Tanpa foto</span>
-                  )}
-                </div>
-                <div>
-                  <h2>{item.title}</h2>
-                  <p className="admin-meta">
-                    {item.period} · {PROGRAM_STATUSES[item.status]}
+          </EditorDialog>
+        )}
+        {addingPeriod && (
+          <EditorDialog
+            title="Tambah periode program kerja"
+            busy={busy}
+            onClose={() => setAddingPeriod(false)}
+          >
+            <form className="admin-form" onSubmit={createPeriod}>
+              <fieldset disabled={busy}>
+                <label>
+                  Periode baru
+                  <input
+                    name="period"
+                    required
+                    maxLength={20}
+                    placeholder="2026/2027"
+                  />
+                  <small>Contoh: 2026/2027 atau 2027.</small>
+                </label>
+                <label className="admin-check">
+                  <input type="checkbox" name="isPublished" defaultChecked />
+                  Tampilkan periode di website
+                </label>
+                {periodError && (
+                  <p role="alert" className="admin-error">
+                    {periodError}
                   </p>
-                  <p className="admin-meta">
-                    Urutan {item.sortOrder} ·{" "}
-                    {item.isPublished
-                      ? "Program dipublikasikan"
-                      : "Program disembunyikan"}
-                  </p>
-                </div>
+                )}
                 <div className="admin-actions">
-                  <button
-                    className="admin-button"
-                    disabled={busy}
-                    aria-label={`Edit ${item.title}`}
-                    onClick={() => {
-                      setEditing(item);
-                      setNotice("");
-                    }}
-                  >
-                    Edit
+                  <button type="submit" className="admin-button primary">
+                    <PendingLabel pending={busy} text="Menyimpan periode…">
+                      Simpan periode
+                    </PendingLabel>
                   </button>
                   <button
-                    className="admin-button danger"
-                    disabled={busy}
-                    aria-label={`Hapus ${item.title}`}
-                    onClick={() => void remove(item)}
+                    type="button"
+                    className="admin-button"
+                    onClick={() => setAddingPeriod(false)}
                   >
-                    Hapus
+                    Batal
                   </button>
                 </div>
-              </article>
+              </fieldset>
+            </form>
+          </EditorDialog>
+        )}
+        {!!periods.length && (
+          <div
+            className="admin-media-tabs"
+            role="tablist"
+            aria-label="Periode program kerja"
+          >
+            {periods.map((item, index) => (
+              <button
+                key={item.period}
+                ref={(node) => {
+                  periodButtons.current[index] = node;
+                }}
+                type="button"
+                role="tab"
+                className="admin-button"
+                id={`program-period-${item.period.replaceAll("/", "-")}`}
+                aria-controls="program-period-panel"
+                aria-selected={currentPeriod?.period === item.period}
+                tabIndex={currentPeriod?.period === item.period ? 0 : -1}
+                disabled={busy}
+                onClick={() => setPeriod(item.period)}
+                onKeyDown={(event) => {
+                  let next: number;
+                  if (event.key === "ArrowRight")
+                    next = (index + 1) % periods.length;
+                  else if (event.key === "ArrowLeft")
+                    next = (index + periods.length - 1) % periods.length;
+                  else if (event.key === "Home") next = 0;
+                  else if (event.key === "End") next = periods.length - 1;
+                  else return;
+                  event.preventDefault();
+                  setPeriod(periods[next].period);
+                  periodButtons.current[next]?.focus();
+                }}
+              >
+                {item.period}
+              </button>
             ))}
           </div>
+        )}
+        <div
+          role={currentPeriod ? "tabpanel" : undefined}
+          id="program-period-panel"
+          aria-labelledby={
+            currentPeriod
+              ? `program-period-${currentPeriod.period.replaceAll("/", "-")}`
+              : undefined
+          }
+          tabIndex={currentPeriod ? 0 : undefined}
+        >
+          {currentPeriod && (
+            <div className="admin-period-summary">
+              <div>
+                <h2>Periode {currentPeriod.period}</h2>
+                <p className="admin-meta">
+                  {currentPeriod.isPublished
+                    ? "Periode ditampilkan di website"
+                    : "Periode disembunyikan dari website"}
+                </p>
+                <p className="admin-meta">
+                  Periode muncul jika ada program yang dipublikasikan. Status
+                  tiap program tetap tersimpan saat periode disembunyikan.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="admin-button"
+                disabled={busy}
+                onClick={() => void togglePeriod()}
+              >
+                {currentPeriod.isPublished
+                  ? "Sembunyikan periode"
+                  : "Tampilkan periode"}
+              </button>
+            </div>
+          )}
+          <div className="admin-toolbar">
+            <label>
+              Cari program
+              <input
+                type="search"
+                value={search}
+                maxLength={150}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <p>
+              {periodItems.length} program
+              {currentPeriod ? ` dalam periode ${currentPeriod.period}` : ""}
+            </p>
+          </div>
+          {loading ? (
+            <p className="admin-notice" role="status">
+              <PendingLabel pending text="Memuat program kerja…">
+                Memuat program kerja
+              </PendingLabel>
+            </p>
+          ) : error && items.length === 0 ? null : !filtered.length ? (
+            <div className="admin-empty">
+              <h2>
+                {search
+                  ? "Program tidak ditemukan"
+                  : "Belum ada program kerja"}
+              </h2>
+              <p>
+                {search
+                  ? "Coba kata kunci lain."
+                  : "Gunakan Tambah program untuk membuat program pertama."}
+              </p>
+            </div>
+          ) : (
+            <div className="admin-list">
+              {filtered.map((item) => {
+                const modeLabel =
+                  item.registrationMode === "internal"
+                    ? "Formulir Website"
+                    : "Tautan Eksternal";
+                const count = counts !== null ? (counts[item.id] ?? 0) : null;
+                const countText =
+                  count !== null
+                    ? item.registrationMaxQuota !== null
+                      ? `${count} / ${item.registrationMaxQuota} peserta`
+                      : `${count} peserta`
+                    : null;
+
+                return (
+                  <article className="admin-content-row" key={item.id}>
+                    <div className="admin-thumb">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.title}
+                          fill
+                          sizes="76px"
+                        />
+                      ) : (
+                        <span className="admin-meta">Tanpa foto</span>
+                      )}
+                    </div>
+                    <div>
+                      <h2>{item.title}</h2>
+                      <p className="admin-meta">
+                        {item.period} · {PROGRAM_STATUSES[item.status]}
+                      </p>
+                      <div className="admin-row-badges">
+                        <span
+                          className={`admin-status ${
+                            item.registrationMode === "internal"
+                              ? "internal"
+                              : ""
+                          }`}
+                        >
+                          {modeLabel}
+                        </span>
+                        {countText !== null && (
+                          <span className="admin-meta" style={{ marginTop: 0 }}>
+                            {countText}
+                          </span>
+                        )}
+                        <span
+                          className={`admin-status ${
+                            item.isPublished ? "published" : ""
+                          }`}
+                        >
+                          {item.isPublished
+                            ? "Program dipublikasikan"
+                            : "Program disembunyikan"}
+                        </span>
+                        <span className="admin-meta" style={{ marginTop: 0 }}>
+                          Urutan {item.sortOrder}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="admin-actions">
+                      <button
+                        type="button"
+                        className="admin-button"
+                        disabled={busy}
+                        aria-label={`Lihat peserta ${item.title}`}
+                        onClick={() =>
+                          selectSectionTab("registrations", {
+                            programId: item.id,
+                            focusPanel: true,
+                          })
+                        }
+                      >
+                        Lihat peserta
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-button"
+                        disabled={busy}
+                        aria-label={`Edit ${item.title}`}
+                        onClick={() => {
+                          setSavedDialogNotice("");
+                          setEditing(item);
+                          setNotice("");
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-button danger"
+                        disabled={busy}
+                        aria-label={`Hapus ${item.title}`}
+                        onClick={() => void remove(item)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div
+        ref={registrationsPanel}
+        role="tabpanel"
+        id="programs-panel-registrations"
+        aria-labelledby="programs-tab-registrations"
+        hidden={activeTab !== "registrations"}
+        tabIndex={0}
+      >
+        {activeTab === "registrations" && (
+          <ProgramRegistrationsManager
+            programId={participantProgramId}
+            onProgramIdChange={handleParticipantProgramChange}
+            onDataChanged={() => void load()}
+            onBusyChange={setRegistrationsBusy}
+          />
         )}
       </div>
     </>
@@ -468,7 +703,6 @@ const fields = [
   { key: "executionDate", label: "Jadwal pelaksanaan", max: 200 },
   { key: "time", label: "Waktu kegiatan", max: 200 },
   { key: "location", label: "Lokasi", max: 300 },
-  { key: "gformLink", label: "Tautan pendaftaran", max: 2000, url: true },
   { key: "price", label: "Biaya registrasi", max: 200 },
   { key: "contactPerson", label: "Narahubung", max: 500 },
   {
@@ -490,38 +724,86 @@ const fields = [
 function ProgramEditor({
   item,
   initialPeriod,
+  savedNotice,
   onCancel,
   onSaved,
   onBusy,
 }: {
   item: Program | null;
   initialPeriod: string;
+  savedNotice: string;
   onCancel: () => void;
   onSaved: (item: Program) => Promise<void>;
   onBusy: (busy: boolean) => void;
 }) {
-  const [saving, setSaving] = useState(false),
-    [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState<Program["status"]>(
+    item?.status || "upcoming",
+  );
+  const [registrationMode, setRegistrationMode] =
+    useState<ProgramRegistrationMode>(item?.registrationMode || "external");
+  const [gformLink, setGformLink] = useState(item?.gformLink || "");
+  const [registrationMaxQuota, setRegistrationMaxQuota] = useState(
+    item?.registrationMaxQuota != null ? String(item.registrationMaxQuota) : "",
+  );
+  const [registrationGroupLink, setRegistrationGroupLink] = useState(
+    item?.registrationGroupLink || "",
+  );
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
+  const copyTimer = useRef<number | null>(null);
+
   const [selected, setSelected] = useState<{
     url: string;
     name: string;
   } | null>(null);
-  const [photoError, setPhotoError] = useState(""),
-    [removeImage, setRemoveImage] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [removeImage, setRemoveImage] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const submitting = useRef(false);
+
   useEffect(
     () => () => {
       if (selected) URL.revokeObjectURL(selected.url);
     },
     [selected],
   );
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
+
   const preview = selected?.url || (!removeImage ? item?.imageUrl : null);
+  const publicRegistrationPath = item
+    ? `/program-kerja/${item.id}/daftar`
+    : "";
+
   function resetPhoto() {
     setSelected(null);
     setPhotoError("");
     if (fileInput.current) fileInput.current.value = "";
   }
+
+  async function copyPublicLink(path: string) {
+    setCopyError("");
+    const fullUrl =
+      typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard tidak tersedia");
+      }
+      await navigator.clipboard.writeText(fullUrl);
+      setCopied(true);
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopyError(`Salin tautan berikut secara manual: ${fullUrl}`);
+    }
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (photoError || saving || submitting.current) return;
@@ -529,8 +811,14 @@ function ProgramEditor({
     const data: Record<string, unknown> = {
       sortOrder: Number(form.get("sortOrder")),
       isPublished: form.get("isPublished") === "on",
-      status: form.get("status"),
+      status,
       icon: form.get("icon"),
+      registrationMode,
+      gformLink: registrationMode === "external" ? gformLink : "",
+      registrationGroupLink:
+        registrationMode === "internal" ? registrationGroupLink : "",
+      registrationMaxQuota:
+        registrationMode === "internal" ? registrationMaxQuota : "",
     };
     for (const field of fields) {
       const value = String(form.get(field.key) || "");
@@ -561,18 +849,22 @@ function ProgramEditor({
         },
       );
       await onSaved(result.item);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Program gagal disimpan.",
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Program gagal disimpan.");
     } finally {
       setSaving(false);
       submitting.current = false;
       onBusy(false);
     }
   }
+
   return (
     <form className="admin-form" onSubmit={submit} aria-busy={saving}>
+      {savedNotice && (
+        <p className="admin-success" role="status">
+          {savedNotice}
+        </p>
+      )}
       <fieldset disabled={saving}>
         {fields.map((field) => {
           const value = item?.[field.key];
@@ -594,7 +886,7 @@ function ProgramEditor({
                 <input
                   name={field.key}
                   maxLength={field.max}
-                  type={"url" in field ? "url" : "text"}
+                  type="text"
                   required={"required" in field && field.required}
                   defaultValue={defaultValue}
                 />
@@ -605,16 +897,19 @@ function ProgramEditor({
               {field.key === "period" && (
                 <small>Contoh: 2025/2026 atau 2026.</small>
               )}
-              {field.key === "gformLink" && (
-                <small>Wajib diisi jika status pendaftaran dibuka.</small>
-              )}
             </label>
           );
         })}
         <div className="admin-form-columns">
           <label>
             Status pendaftaran
-            <select name="status" defaultValue={item?.status || "upcoming"}>
+            <select
+              name="status"
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as Program["status"])
+              }
+            >
               {Object.entries(PROGRAM_STATUSES).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
@@ -622,6 +917,129 @@ function ProgramEditor({
               ))}
             </select>
           </label>
+          <label>
+            Mode pendaftaran
+            <select
+              name="registrationMode"
+              value={registrationMode}
+              onChange={(event) =>
+                setRegistrationMode(
+                  event.target.value as ProgramRegistrationMode,
+                )
+              }
+            >
+              <option value="external">Tautan Eksternal</option>
+              <option value="internal">Formulir Website (Internal)</option>
+            </select>
+            <small>
+              Pilih Formulir Website untuk pendaftaran langsung di halaman
+              website ini.
+            </small>
+          </label>
+        </div>
+        {registrationMode === "external" ? (
+          <label>
+            Tautan pendaftaran (URL)
+            <input
+              name="gformLink"
+              type="url"
+              maxLength={2000}
+              required={status === "open"}
+              placeholder="https://forms.gle/..."
+              value={gformLink}
+              onChange={(event) => setGformLink(event.target.value)}
+            />
+            <small>
+              {status === "open"
+                ? "Wajib diisi jika status Pendaftaran Dibuka pada mode Tautan Eksternal."
+                : "Opsional saat pendaftaran belum dibuka."}
+            </small>
+          </label>
+        ) : (
+          <>
+            <div className="admin-form-columns">
+              <label>
+                Kuota maksimal peserta (opsional)
+                <input
+                  name="registrationMaxQuota"
+                  type="number"
+                  min={1}
+                  max={2147483647}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder="Tanpa batas"
+                  value={registrationMaxQuota}
+                  onChange={(event) =>
+                    setRegistrationMaxQuota(event.target.value)
+                  }
+                />
+                <small>Kosongkan jika kuota peserta tidak dibatasi.</small>
+              </label>
+              <label>
+                Tautan grup WA/LINE peserta (opsional)
+                <input
+                  name="registrationGroupLink"
+                  type="url"
+                  maxLength={2000}
+                  placeholder="https://line.me/ti/g/..."
+                  value={registrationGroupLink}
+                  onChange={(event) =>
+                    setRegistrationGroupLink(event.target.value)
+                  }
+                />
+                <small>
+                  Ditampilkan kepada peserta setelah formulir berhasil dikirim.
+                </small>
+              </label>
+            </div>
+            {item ? (
+              <div className="admin-registration-link-box">
+                <strong>Tautan formulir pendaftaran publik</strong>
+                <p className="admin-registration-link-path">
+                  {publicRegistrationPath}
+                </p>
+                <div className="admin-actions">
+                  <a
+                    className="admin-button"
+                    href={publicRegistrationPath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Buka halaman
+                  </a>
+                  <button
+                    type="button"
+                    className="admin-button"
+                    onClick={() => void copyPublicLink(publicRegistrationPath)}
+                  >
+                    {copied ? "Tautan tersalin" : "Salin tautan"}
+                  </button>
+                </div>
+                {copied && (
+                  <span className="sr-only" role="status">
+                    Tautan formulir pendaftaran berhasil disalin.
+                  </span>
+                )}
+                {copyError && (
+                  <p className="admin-error" role="alert">
+                    {copyError}
+                  </p>
+                )}
+                <small>
+                  Peserta dapat mengakses halaman ini setelah program dan
+                  periode dipublikasikan dengan status Pendaftaran Dibuka.
+                </small>
+              </div>
+            ) : (
+              <p className="admin-notice">
+                Setelah program disimpan, tautan formulir publik
+                (/program-kerja/[id]/daftar) dengan tombol Buka halaman dan
+                Salin tautan akan muncul di sini.
+              </p>
+            )}
+          </>
+        )}
+        <div className="admin-form-columns">
           <label>
             Ikon program
             <select name="icon" defaultValue={item?.icon || "code"}>
@@ -641,7 +1059,7 @@ function ProgramEditor({
               max={10000}
               step={1}
               required
-              defaultValue={item?.sortOrder || 0}
+              defaultValue={item?.sortOrder ?? 0}
             />
             <small>Angka kecil tampil dahulu dalam periode yang sama.</small>
           </label>
@@ -759,10 +1177,12 @@ function ProgramEditor({
             type="submit"
             disabled={Boolean(photoError)}
           >
-            <PendingLabel pending={saving} text="Menyimpan program…">Simpan program</PendingLabel>
+            <PendingLabel pending={saving} text="Menyimpan program…">
+              Simpan program
+            </PendingLabel>
           </button>
           <button className="admin-button" type="button" onClick={onCancel}>
-            Batal
+            {savedNotice ? "Tutup" : "Batal"}
           </button>
         </div>
       </fieldset>
