@@ -37,10 +37,7 @@ export async function generateMetadata({
   const data = await getProgramRegistrationData(id);
 
   if (!data.program || !data.program.isPublished) {
-    return {
-      title: "Program Kerja Tidak Ditemukan",
-      robots: { index: false, follow: false },
-    };
+    notFound();
   }
 
   return {
