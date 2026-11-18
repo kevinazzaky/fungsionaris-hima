@@ -14,11 +14,17 @@ import {
 import { initialPrograms } from "../src/lib/program-seed";
 import {
   validateProgram,
+  validateProgramFormSettings,
   type Program,
+  type ProgramInput,
   type ProgramRepository,
 } from "../src/domain/programs";
 import { programPeriods } from "../src/components/home/program-periods";
-import { saveProgram, deleteProgram } from "../src/use-cases/manage-programs";
+import {
+  saveProgram,
+  saveProgramFormSettings,
+  deleteProgram,
+} from "../src/use-cases/manage-programs";
 import type { MediaStorage } from "../src/domain/repositories";
 
 test("sembilan program lama tervalidasi dan dikelompokkan menurut periode tanpa kehilangan detail", () => {
@@ -493,4 +499,251 @@ test("konfigurasi formulir pendaftaran memvalidasi, menormalisasi nilai lama, da
   assert.equal(formatCustomResponseValue(false), "Tidak");
   assert.equal(formatCustomResponseValue("  Hadir  "), "Hadir");
   assert.equal(formatCustomResponseValue(undefined), "");
+});
+
+test("validateProgramFormSettings memvalidasi status, tautan grup, kuota, dan konfigurasi formulir", () => {
+  const validConfig = validateProgramFormConfig({
+    builtInFields: {
+      angkatan: "hidden",
+      noHp: "required",
+      idLine: "optional",
+      email: "required",
+      catatan: "hidden",
+    },
+    customFields: [
+      {
+        id: "ukuran_kaos",
+        label: "Ukuran Kaos",
+        type: "select",
+        required: true,
+        options: ["S", "M", "L"],
+      },
+    ],
+  });
+
+  const parsed = validateProgramFormSettings({
+    status: "open",
+    registrationGroupLink: "https://chat.whatsapp.com/contoh-grup",
+    registrationMaxQuota: "150",
+    registrationFormConfig: validConfig,
+  });
+  assert.equal(parsed.status, "open");
+  assert.equal(
+    parsed.registrationGroupLink,
+    "https://chat.whatsapp.com/contoh-grup",
+  );
+  assert.equal(parsed.registrationMaxQuota, 150);
+  assert.deepEqual(parsed.registrationFormConfig, validConfig);
+
+  const defaults = validateProgramFormSettings({
+    status: "upcoming",
+    registrationGroupLink: "",
+    registrationMaxQuota: "",
+    registrationFormConfig: null,
+  });
+  assert.equal(defaults.status, "upcoming");
+  assert.equal(defaults.registrationGroupLink, "");
+  assert.equal(defaults.registrationMaxQuota, null);
+  assert.deepEqual(defaults.registrationFormConfig, DEFAULT_PROGRAM_FORM_CONFIG);
+
+  const fromJson = validateProgramFormSettings({
+    status: "closed",
+    registrationMaxQuota: 40,
+    registrationFormConfig: JSON.stringify(validConfig),
+  });
+  assert.equal(fromJson.status, "closed");
+  assert.equal(fromJson.registrationGroupLink, "");
+  assert.equal(fromJson.registrationMaxQuota, 40);
+  assert.deepEqual(fromJson.registrationFormConfig, validConfig);
+
+  for (const invalid of [
+    {},
+    { status: "invalid" },
+    { status: "open", registrationGroupLink: "javascript:alert(1)" },
+    { status: "open", registrationGroupLink: "bukan-url" },
+    { status: "open", registrationMaxQuota: 0 },
+    { status: "open", registrationMaxQuota: -1 },
+    { status: "open", registrationMaxQuota: 1.5 },
+    { status: "open", registrationMaxQuota: "abc" },
+    { status: "open", registrationFormConfig: "{invalid-json" },
+    { status: "open", registrationFormConfig: { builtInFields: { nama: "hidden" } } },
+    {
+      status: "open",
+      registrationFormConfig: {
+        builtInFields: DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+        customFields: [
+          {
+            id: "ukuran",
+            label: "Ukuran",
+            type: "select",
+            required: true,
+            options: [],
+          },
+        ],
+      },
+    },
+  ]) {
+    assert.throws(() => validateProgramFormSettings(invalid), ValidationError);
+  }
+});
+
+test("saveProgramFormSettings memperbarui pengaturan formulir sambil menjaga metadata dan foto program", async () => {
+  const internalId = "11111111-1111-4111-8111-111111111111";
+  const externalId = "22222222-2222-4222-8222-222222222222";
+  const savedCalls: Array<{
+    input: ProgramInput;
+    id?: string;
+    imagePath?: string | null;
+  }> = [];
+
+  const programs = new Map<string, Program>([
+    [
+      internalId,
+      {
+        ...initialPrograms[0],
+        id: internalId,
+        title: "Workshop Cloud",
+        body: "Pelatihan cloud untuk mahasiswa.",
+        fullDescription: "Deskripsi lengkap workshop.",
+        period: "2025/2026",
+        executionDate: "20 November 2026",
+        time: "09.00 WITA",
+        location: "Aula Undiknas",
+        status: "upcoming",
+        icon: "code",
+        gformLink: "https://example.com/legacy-link",
+        registrationMode: "internal",
+        registrationGroupLink: "",
+        registrationMaxQuota: null,
+        registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
+        speakers: ["Pembicara Satu"],
+        price: "Gratis",
+        benefits: ["E-sertifikat", "Materi"],
+        contactPerson: "Panitia (08123)",
+        imagePath: "programs/existing-cover.webp",
+        imageUrl: "https://cdn.example/programs/existing-cover.webp",
+        sortOrder: 2,
+        isPublished: true,
+      },
+    ],
+    [
+      externalId,
+      {
+        ...initialPrograms[0],
+        id: externalId,
+        registrationMode: "external",
+        imagePath: "programs/external.webp",
+        imageUrl: null,
+      },
+    ],
+  ]);
+
+  const repository: Pick<ProgramRepository, "get" | "save"> = {
+    get: async (id) => programs.get(id) ?? null,
+    save: async (input, id, imagePath) => {
+      savedCalls.push({ input, id, imagePath });
+      const prev = id ? programs.get(id)! : null;
+      const updated: Program = {
+        ...input,
+        id: id || "new",
+        imagePath: imagePath === undefined ? (prev?.imagePath ?? null) : imagePath,
+        imageUrl: prev?.imageUrl ?? null,
+      };
+      programs.set(updated.id, updated);
+      return updated;
+    },
+  };
+
+  for (const blankId of ["", "   "]) {
+    await assert.rejects(
+      saveProgramFormSettings(repository, blankId, { status: "open" }),
+      (error: unknown) =>
+        error instanceof ValidationError &&
+        error.message === "Program kerja tidak ditemukan.",
+    );
+  }
+
+  await assert.rejects(
+    saveProgramFormSettings(repository, "33333333-3333-4333-8333-333333333333", {
+      status: "open",
+    }),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.message === "Program kerja tidak ditemukan.",
+  );
+
+  await assert.rejects(
+    saveProgramFormSettings(repository, externalId, { status: "open" }),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.message ===
+        "Pengaturan formulir hanya tersedia untuk program bermode Formulir Website.",
+  );
+
+  await assert.rejects(
+    saveProgramFormSettings(repository, internalId, {
+      status: "open",
+      registrationGroupLink: "javascript:alert(1)",
+    }),
+    ValidationError,
+  );
+  assert.equal(savedCalls.length, 0);
+
+  const nextConfig = validateProgramFormConfig({
+    builtInFields: {
+      angkatan: "hidden",
+      noHp: "required",
+      idLine: "hidden",
+      email: "required",
+      catatan: "optional",
+    },
+    customFields: [
+      {
+        id: "asal_kampus",
+        label: "Asal Kampus",
+        type: "text",
+        required: true,
+        placeholder: "Undiknas",
+      },
+    ],
+  });
+
+  const saved = await saveProgramFormSettings(repository, internalId, {
+    status: "open",
+    registrationGroupLink: "https://line.me/ti/g/workshop-cloud",
+    registrationMaxQuota: 80,
+    registrationFormConfig: nextConfig,
+  });
+
+  assert.equal(savedCalls.length, 1);
+  assert.equal(savedCalls[0].id, internalId);
+  assert.equal(savedCalls[0].imagePath, undefined);
+  assert.equal("id" in savedCalls[0].input, false);
+  assert.equal("imagePath" in savedCalls[0].input, false);
+  assert.equal("imageUrl" in savedCalls[0].input, false);
+
+  assert.equal(saved.status, "open");
+  assert.equal(
+    saved.registrationGroupLink,
+    "https://line.me/ti/g/workshop-cloud",
+  );
+  assert.equal(saved.registrationMaxQuota, 80);
+  assert.deepEqual(saved.registrationFormConfig, nextConfig);
+  assert.equal(saved.title, "Workshop Cloud");
+  assert.equal(saved.body, "Pelatihan cloud untuk mahasiswa.");
+  assert.equal(saved.fullDescription, "Deskripsi lengkap workshop.");
+  assert.equal(saved.period, "2025/2026");
+  assert.equal(saved.executionDate, "20 November 2026");
+  assert.equal(saved.time, "09.00 WITA");
+  assert.equal(saved.location, "Aula Undiknas");
+  assert.equal(saved.icon, "code");
+  assert.equal(saved.gformLink, "https://example.com/legacy-link");
+  assert.equal(saved.registrationMode, "internal");
+  assert.deepEqual(saved.speakers, ["Pembicara Satu"]);
+  assert.equal(saved.price, "Gratis");
+  assert.deepEqual(saved.benefits, ["E-sertifikat", "Materi"]);
+  assert.equal(saved.contactPerson, "Panitia (08123)");
+  assert.equal(saved.sortOrder, 2);
+  assert.equal(saved.isPublished, true);
+  assert.equal(saved.imagePath, "programs/existing-cover.webp");
 });

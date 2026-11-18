@@ -1435,6 +1435,7 @@ test("modul route.ts Next.js mengekspor handler yang tepat dan tidak membuka GET
       assert.equal(typeof adminExportRoute.GET, 'function');
 
       process.env.DATABASE_URL = 'postgresql://test:test@db.example.invalid:5432/test';
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
       globalThis.prismaConnectionString = process.env.DATABASE_URL;
       const customFormConfig = {
         builtInFields: {
@@ -1810,6 +1811,255 @@ test("AccessError asli tetap menghasilkan 401 walau constructor.name terminifika
           },
         );
         assert.equal(exportRes.status, 401);
+      })().catch((err) => { console.error(err); process.exitCode = 1; });
+      `,
+    ],
+    { cwd: process.cwd(), encoding: "utf8", timeout: 20000 },
+  );
+  assert.equal(
+    result.status,
+    0,
+    result.error?.message || result.stderr || result.stdout,
+  );
+});
+
+test("route PATCH /api/admin/programs/[id]/form memeriksa origin, auth admin, UUID, JSON, mode internal, dan menyimpan pengaturan tanpa mengubah foto", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--conditions=react-server",
+      "--import=tsx",
+      "-e",
+      `
+      const assert = require('node:assert/strict');
+      const Module = require('node:module');
+      const { AccessError } = require('./src/data/auth.ts');
+      const originalLoad = Module._load;
+      let adminAllowed = false;
+
+      Object.defineProperty(AccessError, 'name', { value: 'a' });
+
+      Module._load = function (request, parent, isMain) {
+        if (request === '@/data/auth') {
+          return {
+            AccessError,
+            requireAdmin: async () => {
+              if (!adminAllowed) throw new AccessError();
+              return { id: 'admin-1', email: 'admin@example.com' };
+            },
+          };
+        }
+        return originalLoad.call(this, request, parent, isMain);
+      };
+
+      const formRoute = require('./src/app/api/admin/programs/[id]/form/route.ts');
+      assert.equal(typeof formRoute.PATCH, 'function');
+      assert.equal(formRoute.GET, undefined);
+      assert.equal(formRoute.POST, undefined);
+      assert.equal(formRoute.DELETE, undefined);
+
+      process.env.DATABASE_URL = 'postgresql://test:test@db.example.invalid:5432/test';
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+      globalThis.prismaConnectionString = process.env.DATABASE_URL;
+
+      const internalId = '11111111-1111-4111-8111-111111111111';
+      const externalId = '33333333-3333-4333-8333-333333333333';
+      const missingId = '44444444-4444-4444-8444-444444444444';
+
+      let internalRow = {
+        id: internalId,
+        title: 'IT Versary & Sertijab 2026',
+        body: 'Ringkasan acara.',
+        fullDescription: 'Deskripsi lengkap acara.',
+        period: '2025/2026',
+        executionDate: '20 Desember 2026',
+        time: '10.00 WITA',
+        location: 'Aula Kampus',
+        status: 'upcoming',
+        icon: 'cake',
+        gformLink: '',
+        registrationMode: 'internal',
+        registrationGroupLink: '',
+        registrationMaxQuota: null,
+        registrationFormConfig: {
+          builtInFields: {
+            angkatan: 'required',
+            noHp: 'required',
+            idLine: 'required',
+            email: 'optional',
+            catatan: 'optional',
+          },
+          customFields: [],
+        },
+        speakers: ['Narasumber 1'],
+        benefits: ['Sertifikat'],
+        price: 'Gratis',
+        contactPerson: 'HIMA TI',
+        imagePath: 'programs/existing-cover.webp',
+        sortOrder: 4,
+        isPublished: true,
+        createdAt: new Date('2026-11-18T00:00:00Z'),
+        updatedAt: new Date('2026-11-18T00:00:00Z'),
+      };
+      const externalRow = {
+        ...internalRow,
+        id: externalId,
+        registrationMode: 'external',
+        gformLink: 'https://example.com/gform',
+      };
+      const savedUpdates = [];
+      let findCalls = 0;
+
+      globalThis.prisma = {
+        $transaction: async (fn) => fn({
+          programPeriod: { upsert: async () => ({ period: '2025/2026', isPublished: true }) },
+          program: {
+            update: async ({ where, data }) => {
+              savedUpdates.push({ where, data });
+              internalRow = { ...internalRow, ...data };
+              return internalRow;
+            },
+          },
+        }),
+        program: {
+          findUnique: async ({ where }) => {
+            findCalls += 1;
+            if (where.id === internalId) return internalRow;
+            if (where.id === externalId) return externalRow;
+            return null;
+          },
+        },
+      };
+
+      const validBody = {
+        status: 'open',
+        registrationGroupLink: 'https://line.me/ti/g/it-versary',
+        registrationMaxQuota: 120,
+        registrationFormConfig: {
+          builtInFields: {
+            angkatan: 'hidden',
+            noHp: 'required',
+            idLine: 'hidden',
+            email: 'required',
+            catatan: 'optional',
+          },
+          customFields: [
+            {
+              id: 'asal_kampus',
+              label: 'Asal Kampus',
+              type: 'text',
+              required: true,
+              placeholder: 'Undiknas',
+              options: [],
+            },
+          ],
+        },
+      };
+
+      const makeReq = (id, body, headers = {}) =>
+        new Request('https://example.com/api/admin/programs/' + id + '/form', {
+          method: 'PATCH',
+          headers: {
+            origin: 'https://example.com',
+            host: 'example.com',
+            'content-type': 'application/json',
+            ...headers,
+          },
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+        });
+
+      (async () => {
+        adminAllowed = true;
+        const crossOrigin = await formRoute.PATCH(
+          makeReq(internalId, validBody, { origin: 'https://evil.example' }),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(crossOrigin.status, 401);
+        assert.equal(crossOrigin.headers.get('cache-control'), 'no-store');
+        assert.equal(findCalls, 0);
+
+        adminAllowed = false;
+        const unauth = await formRoute.PATCH(
+          makeReq(internalId, validBody),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(unauth.status, 401);
+        assert.equal(unauth.headers.get('cache-control'), 'no-store');
+        assert.equal(findCalls, 0);
+
+        adminAllowed = true;
+        const badUuid = await formRoute.PATCH(
+          makeReq('bad-id', validBody),
+          { params: Promise.resolve({ id: 'bad-id' }) },
+        );
+        assert.equal(badUuid.status, 400);
+        assert.equal(badUuid.headers.get('cache-control'), 'no-store');
+        assert.equal(findCalls, 0);
+
+        const badJson = await formRoute.PATCH(
+          makeReq(internalId, '{invalid-json'),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(badJson.status, 400);
+        assert.equal(badJson.headers.get('cache-control'), 'no-store');
+
+        const arrayJson = await formRoute.PATCH(
+          makeReq(internalId, '[]'),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(arrayJson.status, 400);
+
+        const oversizedJson = await formRoute.PATCH(
+          makeReq(internalId, { ...validBody, padding: 'x'.repeat(65 * 1024) }),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(oversizedJson.status, 400);
+
+        const missingProgram = await formRoute.PATCH(
+          makeReq(missingId, validBody),
+          { params: Promise.resolve({ id: missingId }) },
+        );
+        assert.equal(missingProgram.status, 400);
+        assert.equal((await missingProgram.json()).error, 'Program kerja tidak ditemukan.');
+
+        const externalProgram = await formRoute.PATCH(
+          makeReq(externalId, validBody),
+          { params: Promise.resolve({ id: externalId }) },
+        );
+        assert.equal(externalProgram.status, 400);
+        assert.equal(
+          (await externalProgram.json()).error,
+          'Pengaturan formulir hanya tersedia untuk program bermode Formulir Website.',
+        );
+
+        const invalidForm = await formRoute.PATCH(
+          makeReq(internalId, { ...validBody, registrationGroupLink: 'javascript:alert(1)' }),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(invalidForm.status, 400);
+        assert.equal(savedUpdates.length, 0);
+
+        const ok = await formRoute.PATCH(
+          makeReq(internalId, validBody),
+          { params: Promise.resolve({ id: internalId }) },
+        );
+        assert.equal(ok.status, 200);
+        assert.equal(ok.headers.get('cache-control'), 'no-store');
+        const json = await ok.json();
+        assert.equal(savedUpdates.length, 1);
+        assert.equal('imagePath' in savedUpdates[0].data, false);
+        assert.equal('imageUrl' in savedUpdates[0].data, false);
+        assert.equal('id' in savedUpdates[0].data, false);
+
+        assert.equal(json.item.status, 'open');
+        assert.equal(json.item.registrationGroupLink, 'https://line.me/ti/g/it-versary');
+        assert.equal(json.item.registrationMaxQuota, 120);
+        assert.deepEqual(json.item.registrationFormConfig, validBody.registrationFormConfig);
+        assert.equal(json.item.title, 'IT Versary & Sertijab 2026');
+        assert.equal(json.item.imagePath, 'programs/existing-cover.webp');
+        assert.deepEqual(json.item.speakers, ['Narasumber 1']);
+        assert.deepEqual(json.item.benefits, ['Sertifikat']);
+        assert.equal(json.item.sortOrder, 4);
       })().catch((err) => { console.error(err); process.exitCode = 1; });
       `,
     ],
