@@ -18,6 +18,7 @@
     "db:seed-programs": "tsx scripts/seed-programs.ts",
     "db:admin": "tsx scripts/grant-admin.ts",
     "db:create-admin": "tsx scripts/create-admin.ts",
+    "db:voting-pin": "tsx scripts/set-voting-pin.ts",
     "db:import-registrations": "tsx scripts/import-registrations.ts"
   },
   "dependencies": {
