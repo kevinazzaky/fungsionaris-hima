@@ -10,6 +10,7 @@ import { Cake } from "@phosphor-icons/react/dist/ssr";
 import { ProgramPeriodTabs } from "../src/components/detail/program-period-tabs";
 import { ProgramModal } from "../src/components/home/program-modal";
 import { ProgramRegistrationForm } from "../src/components/programs/program-registration-form";
+import { DEFAULT_PROGRAM_FORM_CONFIG } from "../src/domain/program-form-config";
 import type { Program } from "../src/domain/programs";
 import { initialPrograms } from "../src/lib/program-seed";
 
@@ -28,6 +29,7 @@ const baseInternalProgram: Program = {
   registrationMode: "internal",
   registrationGroupLink: "",
   registrationMaxQuota: 50,
+  registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
   speakers: [],
   price: "",
   benefits: [],

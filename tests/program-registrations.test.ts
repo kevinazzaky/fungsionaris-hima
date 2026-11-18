@@ -5,6 +5,10 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { ValidationError } from "../src/domain/admin";
+import {
+  DEFAULT_PROGRAM_FORM_CONFIG,
+  type ProgramFormConfig,
+} from "../src/domain/program-form-config";
 import type { Program, ProgramRepository } from "../src/domain/programs";
 import {
   ConflictError,
@@ -48,6 +52,7 @@ const baseProgram: Program = {
   registrationMode: "internal",
   registrationGroupLink: "https://line.me/ti/g/group-invite",
   registrationMaxQuota: 2,
+  registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
   speakers: [],
   benefits: [],
   price: "",
@@ -71,6 +76,7 @@ function makeRegistration(
     idLine: validInput.idLine,
     email: validInput.email,
     catatan: "Siap mengikuti acara.\nTerima kasih.",
+    customResponses: {},
     submittedAt: new Date("2026-11-17T08:00:00Z"),
     createdAt: new Date("2026-11-17T08:00:00Z"),
     ...overrides,
@@ -430,6 +436,10 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
   assert.equal(pageData.registeredCount, 12);
   assert.equal(pageData.program?.id, baseProgram.id);
   assert.equal(pageData.program?.registrationGroupLink, "");
+  assert.deepEqual(
+    pageData.program?.registrationFormConfig,
+    DEFAULT_PROGRAM_FORM_CONFIG,
+  );
   assert.deepEqual(Object.keys(pageData).sort(), [
     "configured",
     "program",
@@ -475,6 +485,25 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
         status: 'open',
         registrationMode: 'internal',
         registrationMaxQuota: 1,
+        registrationFormConfig: {
+          builtInFields: {
+            angkatan: 'required',
+            noHp: 'required',
+            idLine: 'required',
+            email: 'optional',
+            catatan: 'optional',
+          },
+          customFields: [
+            {
+              id: 'asal_instansi',
+              label: 'Asal Instansi',
+              type: 'text',
+              required: true,
+              placeholder: '',
+              options: [],
+            },
+          ],
+        },
         isPublished: true,
         periodPublished: true,
       };
@@ -488,6 +517,7 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
         idLine: 'made_ti',
         email: '',
         catatan: '',
+        customResponses: { asal_instansi: 'Undiknas' },
         submittedAt: new Date('2026-11-17T08:00:00Z'),
         createdAt: new Date('2026-11-17T08:00:00Z'),
       };
@@ -523,6 +553,7 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
               icon: 'cake',
               gformLink: '',
               registrationGroupLink: '',
+              registrationFormConfig: programRow.registrationFormConfig,
               speakers: [],
               benefits: [],
               price: '',
@@ -539,14 +570,18 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
           },
         },
         programRegistration: {
+          findUnique: async () => savedRow,
           findMany: async ({ where }) => {
             assert.equal(where.programId, programId);
             assert.ok(Array.isArray(where.OR));
             return [{ ...savedRow, program: { title: 'IT Versary & Sertijab 2026', period: '2025/2026' } }];
           },
           groupBy: async () => [{ programId, _count: { _all: 4 } }],
-          update: async () => {
-            throw new Prisma.PrismaClientKnownRequestError('Unique', { code: 'P2002', clientVersion: '7.10.1' });
+          update: async ({ data }) => {
+            if (data.nim === '99999999') {
+              throw new Prisma.PrismaClientKnownRequestError('Unique', { code: 'P2002', clientVersion: '7.10.1' });
+            }
+            return { ...savedRow, ...data };
           },
           delete: async () => {
             throw new Prisma.PrismaClientKnownRequestError('Missing', { code: 'P2025', clientVersion: '7.10.1' });
@@ -557,19 +592,31 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
       (async () => {
         const pub = await programRepository.getPublished(programId);
         assert.equal(pub.id, programId);
+        assert.equal(pub.registrationFormConfig.customFields[0].id, 'asal_instansi');
         assert.equal(await programRepository.getPublished('invalid-uuid'), null);
 
         deleteError = new Prisma.PrismaClientKnownRequestError('FK', { code: 'P2003', clientVersion: '7.10.1' });
         await assert.rejects(programRepository.delete(programId), ValidationError);
 
+        await assert.rejects(
+          programRegistrationRepository.create(programId, {
+            nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '08123456789', idLine: 'made_ti', email: '', catatan: '', customResponses: {},
+          }),
+          ValidationError,
+        );
+
         const created = await programRegistrationRepository.create(programId, {
-          nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '08123456789', idLine: 'made_ti', email: '', catatan: '',
+          nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '08123456789', idLine: 'made_ti', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas', extra: 'ignored' },
         });
         assert.equal(created.id, regId);
+        assert.deepEqual(created.customResponses, { asal_instansi: 'Undiknas' });
+
+        const fetched = await programRegistrationRepository.get(regId);
+        assert.deepEqual(fetched.customResponses, { asal_instansi: 'Undiknas' });
 
         await assert.rejects(
           programRegistrationRepository.create(programId, {
-            nama: 'Ketut', nim: '22010102', angkatan: '2024', noHp: '08123456789', idLine: 'ketut', email: '', catatan: '',
+            nama: 'Ketut', nim: '22010102', angkatan: '2024', noHp: '08123456789', idLine: 'ketut', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas' },
           }),
           (e) => e instanceof ConflictError && e.reason === 'quota',
         );
@@ -578,18 +625,24 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
         throwP2002 = true;
         await assert.rejects(
           programRegistrationRepository.create(programId, {
-            nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '08123456789', idLine: 'made_ti', email: '', catatan: '',
+            nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '08123456789', idLine: 'made_ti', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas' },
           }),
           (e) => e instanceof ConflictError && e.reason === 'duplicate',
         );
 
         const list = await programRegistrationRepository.list({ programId, q: 'made' });
         assert.equal(list[0].programTitle, 'IT Versary & Sertijab 2026');
+        assert.deepEqual(list[0].customResponses, { asal_instansi: 'Undiknas' });
         assert.deepEqual(await programRegistrationRepository.countsByProgram(), { [programId]: 4 });
+
+        const updated = await programRegistrationRepository.update(regId, {
+          nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '', idLine: '', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas Baru' },
+        });
+        assert.deepEqual(updated.customResponses, { asal_instansi: 'Undiknas Baru' });
 
         await assert.rejects(
           programRegistrationRepository.update(regId, {
-            nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '', idLine: '', email: '', catatan: '',
+            nama: 'Made', nim: '99999999', angkatan: '2024', noHp: '', idLine: '', email: '', catatan: '', customResponses: {},
           }),
           ConflictError,
         );
@@ -603,5 +656,367 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
     result.status,
     0,
     result.error?.message || result.stderr || result.stdout,
+  );
+});
+
+const customFormConfig: ProgramFormConfig = {
+  builtInFields: {
+    angkatan: "hidden",
+    noHp: "optional",
+    idLine: "hidden",
+    email: "required",
+    catatan: "required",
+  },
+  customFields: [
+    {
+      id: "asal",
+      label: "Asal Instansi",
+      type: "text",
+      required: true,
+      placeholder: "Undiknas",
+      options: [],
+    },
+    {
+      id: "motivasi",
+      label: "Motivasi",
+      type: "textarea",
+      required: false,
+      placeholder: "",
+      options: [],
+    },
+    {
+      id: "semester",
+      label: "Semester",
+      type: "number",
+      required: true,
+      placeholder: "",
+      options: [],
+    },
+    {
+      id: "ukuran",
+      label: "Ukuran Kaos",
+      type: "select",
+      required: true,
+      placeholder: "",
+      options: ["S", "M", "L"],
+    },
+    {
+      id: "tanggal_lahir",
+      label: "Tanggal Lahir",
+      type: "date",
+      required: false,
+      placeholder: "",
+      options: [],
+    },
+    {
+      id: "setuju",
+      label: "Persetujuan Tata Tertib",
+      type: "checkbox",
+      required: true,
+      placeholder: "",
+      options: [],
+    },
+    {
+      id: "relawan",
+      label: "Bersedia Jadi Relawan",
+      type: "checkbox",
+      required: false,
+      placeholder: "",
+      options: [],
+    },
+  ],
+};
+
+test("validasi pendaftaran mematuhi mode kolom bawaan dan seluruh tipe kolom kustom", () => {
+  const parsed = validateProgramRegistrationInput(
+    {
+      nama: "Ni Putu Ayu",
+      nim: "22010505",
+      angkatan: "bukan-tahun",
+      noHp: "",
+      idLine: "nilai-lama-tersembunyi",
+      email: "ayu@undiknas.ac.id",
+      catatan: "Siap mengikuti\r\nacara.",
+      customResponses: {
+        asal: "  Undiknas Denpasar  ",
+        motivasi: "Belajar\r\nlebih dalam",
+        semester: "4",
+        ukuran: "M",
+        tanggal_lahir: "2004-02-29",
+        setuju: true,
+        unknown_key: "harus dibuang",
+      },
+    },
+    customFormConfig,
+  );
+  assert.equal(parsed.angkatan, "");
+  assert.equal(parsed.noHp, "");
+  assert.equal(parsed.idLine, "");
+  assert.equal(parsed.email, "ayu@undiknas.ac.id");
+  assert.equal(parsed.catatan, "Siap mengikuti\nacara.");
+  assert.deepEqual(parsed.customResponses, {
+    asal: "Undiknas Denpasar",
+    motivasi: "Belajar\nlebih dalam",
+    semester: "4",
+    ukuran: "M",
+    tanggal_lahir: "2004-02-29",
+    setuju: true,
+    relawan: false,
+  });
+  assert.equal("unknown_key" in parsed.customResponses, false);
+
+  const validCustomBase = {
+    nama: "Ni Putu Ayu",
+    nim: "22010505",
+    email: "ayu@undiknas.ac.id",
+    catatan: "Siap",
+    customResponses: {
+      asal: "Undiknas",
+      semester: "4",
+      ukuran: "L",
+      setuju: true,
+    },
+  };
+
+  for (const bad of [
+    { ...validCustomBase, email: "" },
+    { ...validCustomBase, catatan: "" },
+    { ...validCustomBase, noHp: "123" },
+    { ...validCustomBase, customResponses: [] },
+    { ...validCustomBase, customResponses: "str" },
+    {
+      ...validCustomBase,
+      customResponses: { ...validCustomBase.customResponses, asal: "" },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        asal: "a".repeat(201),
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        asal: "baris\ndua",
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        motivasi: "a".repeat(501),
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        semester: "1e5",
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        semester: "1".repeat(31),
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        ukuran: "XXL",
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        tanggal_lahir: "2026-02-29",
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        tanggal_lahir: "2026/02/28",
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        setuju: false,
+      },
+    },
+    {
+      ...validCustomBase,
+      customResponses: {
+        ...validCustomBase.customResponses,
+        setuju: "true",
+      },
+    },
+  ]) {
+    assert.throws(
+      () => validateProgramRegistrationInput(bad, customFormConfig),
+      ValidationError,
+    );
+  }
+});
+
+test("registerProgram dan updateProgramRegistration memvalidasi terhadap konfigurasi program serta mempertahankan key historis", async () => {
+  const customProgram: Program = {
+    ...baseProgram,
+    registrationFormConfig: customFormConfig,
+  };
+  let savedReg = makeRegistration({
+    programId: customProgram.id,
+    angkatan: "",
+    noHp: "",
+    idLine: "",
+    email: "ayu@undiknas.ac.id",
+    catatan: "Siap",
+    customResponses: {
+      asal: "Undiknas",
+      semester: "4",
+      ukuran: "M",
+      setuju: true,
+      legacy_question: "Jawaban lama",
+    },
+  });
+
+  const programRepo: Pick<ProgramRepository, "getPublished" | "get"> = {
+    getPublished: async () => customProgram,
+    get: async () => customProgram,
+  };
+  const regRepo: ProgramRegistrationRepository = {
+    countByProgram: async () => 0,
+    countsByProgram: async () => ({ [customProgram.id]: 1 }),
+    list: async () => [],
+    get: async (id) => (id === savedReg.id ? savedReg : null),
+    create: async (_pid, input) => {
+      savedReg = makeRegistration({ ...input, programId: customProgram.id });
+      return savedReg;
+    },
+    update: async (_id, input) => {
+      savedReg = { ...savedReg, ...input };
+      return savedReg;
+    },
+    delete: async () => savedReg,
+  };
+
+  const registered = await registerProgram(programRepo, regRepo, customProgram.id, {
+    nama: "Ni Putu Ayu",
+    nim: "22010505",
+    email: "ayu@undiknas.ac.id",
+    catatan: "Siap",
+    customResponses: {
+      asal: "Undiknas",
+      semester: -2.5,
+      ukuran: "S",
+      setuju: true,
+      extra_field: "dibuang",
+    },
+  });
+  assert.equal(registered.registration.angkatan, "");
+  assert.equal(registered.registration.customResponses.asal, "Undiknas");
+  assert.equal(registered.registration.customResponses.semester, "-2.5");
+  assert.equal("extra_field" in registered.registration.customResponses, false);
+
+  // Preserve historical key when updating against current form config
+  savedReg = {
+    ...savedReg,
+    customResponses: {
+      ...savedReg.customResponses,
+      legacy_question: "Jawaban lama",
+    },
+  };
+  const updated = await updateProgramRegistration(
+    regRepo,
+    savedReg.id,
+    {
+      nama: "Ni Putu Ayu Diperbarui",
+      nim: "22010505",
+      email: "ayu@undiknas.ac.id",
+      catatan: "Siap",
+      customResponses: {
+        asal: "Undiknas Baru",
+        semester: "6",
+        ukuran: "L",
+        setuju: true,
+        hacker_key: "diabaikan",
+      },
+    },
+    programRepo,
+  );
+  assert.equal(updated.nama, "Ni Putu Ayu Diperbarui");
+  assert.equal(updated.customResponses.asal, "Undiknas Baru");
+  assert.equal(updated.customResponses.legacy_question, "Jawaban lama");
+  assert.equal("hacker_key" in updated.customResponses, false);
+
+  await assert.rejects(
+    updateProgramRegistration(
+      regRepo,
+      "missing-reg",
+      {
+        nama: "Test",
+        nim: "22010505",
+      },
+      programRepo,
+    ),
+    NotFoundError,
+  );
+
+  // Admin edit enforces hidden built-in fields and custom fields while keeping non-hidden contacts lenient.
+  const adminEdited = validateProgramRegistrationAdminUpdate(
+    {
+      nama: "Ni Putu Ayu",
+      nim: "22010505",
+      angkatan: "2024",
+      noHp: "",
+      idLine: "line_lama",
+      email: "",
+      catatan: "",
+      customResponses: {
+        asal: "Undiknas",
+        semester: "4",
+        ukuran: "M",
+        setuju: true,
+      },
+    },
+    customFormConfig,
+  );
+  assert.equal(adminEdited.angkatan, "");
+  assert.equal(adminEdited.idLine, "");
+  assert.equal(adminEdited.email, "");
+  assert.throws(
+    () =>
+      validateProgramRegistrationAdminUpdate(
+        {
+          nama: "Ni Putu Ayu",
+          nim: "22010505",
+          customResponses: {
+            asal: "",
+            semester: "4",
+            ukuran: "M",
+            setuju: true,
+          },
+        },
+        customFormConfig,
+      ),
+    ValidationError,
+  );
+
+  // Missing/unpublished program must fail with NotFoundError before custom field validation runs.
+  await assert.rejects(
+    registerProgram(
+      { getPublished: async () => null },
+      regRepo,
+      customProgram.id,
+      { nama: "Ayu", nim: "22010505" },
+    ),
+    NotFoundError,
   );
 });

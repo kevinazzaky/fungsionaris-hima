@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import * as XLSX from "xlsx";
 import { ValidationError } from "../src/domain/admin";
+import { DEFAULT_PROGRAM_FORM_CONFIG } from "../src/domain/program-form-config";
 import { validateProgram, type Program } from "../src/domain/programs";
 import {
   ConflictError,
@@ -58,6 +59,7 @@ const baseProgram: Program = {
   registrationMode: "internal",
   registrationGroupLink: "https://line.me/ti/g/group-invite",
   registrationMaxQuota: 2,
+  registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
   speakers: [],
   benefits: [],
   price: "",
@@ -92,6 +94,7 @@ function makeRegistration(
     idLine: validPayload.idLine,
     email: validPayload.email,
     catatan: validPayload.catatan,
+    customResponses: {},
     submittedAt: new Date("2026-11-17T08:00:00Z"),
     createdAt: new Date("2026-11-17T08:00:00Z"),
     ...overrides,

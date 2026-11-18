@@ -279,6 +279,117 @@ test("migration PostgreSQL mengaktifkan RLS dan keunikan NIM per periode", async
       0,
     );
     await db.exec("RESET ROLE");
+
+    await db.exec(
+      await readFile(
+        "prisma/migrations/20261118000000_program_custom_form/migration.sql",
+        "utf8",
+      ),
+    );
+
+    const legacyPrograms = await db.query<{
+      id: string;
+      registrationFormConfig: unknown;
+    }>('SELECT id, "registrationFormConfig" FROM "Program" ORDER BY id');
+    assert.equal(legacyPrograms.rows.length, 2);
+    for (const row of legacyPrograms.rows) {
+      assert.deepEqual(row.registrationFormConfig, {});
+    }
+
+    const legacyRegs = await db.query<{
+      id: string;
+      customResponses: unknown;
+    }>('SELECT id, "customResponses" FROM "ProgramRegistration" ORDER BY id');
+    assert.equal(legacyRegs.rows.length, 2);
+    for (const row of legacyRegs.rows) {
+      assert.deepEqual(row.customResponses, {});
+    }
+
+    const sampleFormConfig = {
+      builtInFields: {
+        angkatan: "required",
+        noHp: "optional",
+        idLine: "hidden",
+        email: "required",
+        catatan: "optional",
+      },
+      customFields: [
+        {
+          id: "asal_instansi",
+          label: "Asal Instansi",
+          type: "text",
+          required: true,
+          placeholder: "Universitas Pendidikan Nasional",
+          options: [],
+        },
+      ],
+    };
+    await db.query(
+      'UPDATE "Program" SET "registrationFormConfig" = $1::jsonb WHERE id = $2',
+      [JSON.stringify(sampleFormConfig), firstProgramId],
+    );
+    const updatedProgramConfig = (
+      await db.query<{ registrationFormConfig: unknown }>(
+        'SELECT "registrationFormConfig" FROM "Program" WHERE id = $1',
+        [firstProgramId],
+      )
+    ).rows[0];
+    assert.deepEqual(
+      updatedProgramConfig.registrationFormConfig,
+      sampleFormConfig,
+    );
+
+    const customRegId = randomUUID();
+    const defaultRegId = randomUUID();
+    await db.query(
+      'INSERT INTO "ProgramRegistration" (id, "programId", nama, nim, angkatan, "customResponses") VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
+      [
+        customRegId,
+        firstProgramId,
+        "Peserta Kustom",
+        "22010999",
+        "2024",
+        JSON.stringify({ asal_instansi: "Undiknas", hadir: true }),
+      ],
+    );
+    await db.query(
+      'INSERT INTO "ProgramRegistration" (id, "programId", nama, nim, angkatan) VALUES ($1, $2, $3, $4, $5)',
+      [defaultRegId, firstProgramId, "Peserta Default", "22010888", "2024"],
+    );
+    assert.deepEqual(
+      (
+        await db.query<{ customResponses: unknown }>(
+          'SELECT "customResponses" FROM "ProgramRegistration" WHERE id = $1',
+          [customRegId],
+        )
+      ).rows[0].customResponses,
+      { asal_instansi: "Undiknas", hadir: true },
+    );
+    assert.deepEqual(
+      (
+        await db.query<{ customResponses: unknown }>(
+          'SELECT "customResponses" FROM "ProgramRegistration" WHERE id = $1',
+          [defaultRegId],
+        )
+      ).rows[0].customResponses,
+      {},
+    );
+
+    await db.exec("SET ROLE anon");
+    await assert.rejects(
+      db.query('SELECT "registrationFormConfig" FROM "Program"'),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query('SELECT "customResponses" FROM "ProgramRegistration"'),
+      /permission denied/,
+    );
+    await db.exec("SET ROLE authenticated");
+    assert.equal(
+      (await db.query('SELECT * FROM "ProgramRegistration"')).rows.length,
+      0,
+    );
+    await db.exec("RESET ROLE");
   } finally {
     await db.close();
   }
