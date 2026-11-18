@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PROGRAM_ICONS,
   PROGRAM_STATUSES,
@@ -9,23 +9,61 @@ import {
   type ProgramPeriod,
   type ProgramRegistrationMode,
 } from "@/domain/programs";
-import { ValidationError } from "@/domain/admin";
 import {
   cloneDefaultProgramFormConfig,
   normalizeProgramFormConfig,
-  validateProgramFormConfig,
-  type ProgramFormConfig,
 } from "@/domain/program-form-config";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
 import { PendingLabel } from "@/components/ui/pending-label";
-import { ProgramFormBuilder } from "./program-form-builder";
+import { ProgramFormSettingsManager } from "./program-form-settings-manager";
 import { ProgramRegistrationsManager } from "./program-registrations-manager";
 
-export type ProgramsManagerTab = "programs" | "registrations";
+export type ProgramsManagerTab =
+  | "programs"
+  | "form-settings"
+  | "registrations";
+
+type ProgramNotice = {
+  text: string;
+  actionProgram?: { id: string; title: string };
+};
+
+type ProgramsPayload = {
+  items: Program[];
+  periods: ProgramPeriod[];
+  counts?: Record<string, number>;
+};
+
+function requestProgramsData(
+  signal: AbortSignal | undefined,
+  handlers: {
+    onSuccess: (result: ProgramsPayload) => void;
+    onError: (message: string) => void;
+    onFinally: () => void;
+  },
+) {
+  return requestJson<ProgramsPayload>("/api/admin/programs", { signal })
+    .then((result) => {
+      if (!signal?.aborted) handlers.onSuccess(result);
+    })
+    .catch((err: unknown) => {
+      if (!signal?.aborted) {
+        handlers.onError(
+          err instanceof Error
+            ? err.message
+            : "Program kerja tidak dapat dimuat.",
+        );
+      }
+    })
+    .finally(() => {
+      if (!signal?.aborted) handlers.onFinally();
+    });
+}
 
 const sectionTabs: { id: ProgramsManagerTab; label: string }[] = [
   { id: "programs", label: "Daftar program" },
+  { id: "form-settings", label: "Atur formulir" },
   { id: "registrations", label: "Peserta proker" },
 ];
 
@@ -38,10 +76,17 @@ export function ProgramsManager({
 }) {
   const inFlight = useRef(false);
   const sectionTabButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const programsPanel = useRef<HTMLDivElement>(null);
+  const formSettingsPanel = useRef<HTMLDivElement>(null);
   const registrationsPanel = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<ProgramsManagerTab>(initialTab);
-  const [participantProgramId, setParticipantProgramId] =
-    useState(initialProgramId);
+  const [formProgramId, setFormProgramId] = useState(
+    initialTab === "form-settings" ? initialProgramId : "",
+  );
+  const [participantProgramId, setParticipantProgramId] = useState(
+    initialTab === "registrations" ? initialProgramId : "",
+  );
+  const [formSettingsBusy, setFormSettingsBusy] = useState(false);
   const [registrationsBusy, setRegistrationsBusy] = useState(false);
 
   const [items, setItems] = useState<Program[]>([]);
@@ -53,46 +98,33 @@ export function ProgramsManager({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<ProgramNotice | null>(null);
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState("");
   const [editing, setEditing] = useState<Program | "new" | null>(null);
-  const [savedDialogNotice, setSavedDialogNotice] = useState("");
 
-  const load = useCallback(
-    (signal?: AbortSignal) =>
-      requestJson<{
-        items: Program[];
-        periods: ProgramPeriod[];
-        counts?: Record<string, number>;
-      }>("/api/admin/programs", { signal })
-        .then((result) => {
-          if (!signal?.aborted) {
-            setItems(result.items);
-            setPeriods(result.periods);
-            setCounts(result.counts ?? null);
-            setError("");
-          }
-        })
-        .catch((err: unknown) => {
-          if (!signal?.aborted)
-            setError(
-              err instanceof Error
-                ? err.message
-                : "Program kerja tidak dapat dimuat.",
-            );
-        })
-        .finally(() => {
-          if (!signal?.aborted) setLoading(false);
-        }),
-    [],
-  );
+  function load(signal?: AbortSignal) {
+    return requestProgramsData(signal, {
+      onSuccess: (result) => {
+        setItems(result.items);
+        setPeriods(result.periods);
+        setCounts(result.counts ?? null);
+        setError("");
+      },
+      onError: setError,
+      onFinally: () => setLoading(false),
+    });
+  }
 
   function syncUrl(tab: ProgramsManagerTab, programIdValue: string) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (tab === "registrations") {
       url.searchParams.set("tab", "peserta");
+      if (programIdValue) url.searchParams.set("programId", programIdValue);
+      else url.searchParams.delete("programId");
+    } else if (tab === "form-settings") {
+      url.searchParams.set("tab", "formulir");
       if (programIdValue) url.searchParams.set("programId", programIdValue);
       else url.searchParams.delete("programId");
     } else {
@@ -110,23 +142,51 @@ export function ProgramsManager({
       focusPanel?: boolean;
     },
   ) {
-    if (busy || registrationsBusy || editing || addingPeriod) return;
-    const nextProgramId =
-      options?.programId !== undefined
-        ? options.programId
-        : participantProgramId;
+    if (
+      busy ||
+      registrationsBusy ||
+      formSettingsBusy ||
+      editing ||
+      addingPeriod
+    ) {
+      return;
+    }
+    let nextUrlProgramId = "";
+    if (nextTab === "form-settings") {
+      const resolved =
+        options?.programId !== undefined ? options.programId : formProgramId;
+      setFormProgramId(resolved);
+      nextUrlProgramId = resolved;
+    } else if (nextTab === "registrations") {
+      const resolved =
+        options?.programId !== undefined
+          ? options.programId
+          : participantProgramId;
+      setParticipantProgramId(resolved);
+      nextUrlProgramId = resolved;
+    }
     setActiveTab(nextTab);
-    setParticipantProgramId(nextProgramId);
-    syncUrl(nextTab, nextProgramId);
+    syncUrl(nextTab, nextUrlProgramId);
     if (nextTab === "programs") {
       void load();
     }
     if (options?.focusTab) {
       const index = sectionTabs.findIndex((tab) => tab.id === nextTab);
       if (index >= 0) sectionTabButtons.current[index]?.focus();
-    } else if (options?.focusPanel && nextTab === "registrations") {
-      requestAnimationFrame(() => registrationsPanel.current?.focus());
+    } else if (options?.focusPanel) {
+      if (nextTab === "registrations") {
+        requestAnimationFrame(() => registrationsPanel.current?.focus());
+      } else if (nextTab === "form-settings") {
+        requestAnimationFrame(() => formSettingsPanel.current?.focus());
+      } else {
+        requestAnimationFrame(() => programsPanel.current?.focus());
+      }
     }
+  }
+
+  function handleFormProgramChange(nextProgramId: string) {
+    setFormProgramId(nextProgramId);
+    syncUrl("form-settings", nextProgramId);
   }
 
   function handleParticipantProgramChange(nextProgramId: string) {
@@ -163,7 +223,7 @@ export function ProgramsManager({
       setPeriod(result.period.period);
       setBusy(false);
       setAddingPeriod(false);
-      setNotice("Periode berhasil ditambahkan.");
+      setNotice({ text: "Periode berhasil ditambahkan." });
     } catch (err) {
       setPeriodError(
         err instanceof Error ? err.message : "Periode gagal ditambahkan.",
@@ -179,7 +239,7 @@ export function ProgramsManager({
     inFlight.current = true;
     setBusy(true);
     setError("");
-    setNotice("");
+    setNotice(null);
     try {
       await requestJson("/api/admin/program-periods", {
         method: "PATCH",
@@ -190,11 +250,11 @@ export function ProgramsManager({
         }),
       });
       await load();
-      setNotice(
-        currentPeriod.isPublished
+      setNotice({
+        text: currentPeriod.isPublished
           ? `Periode ${currentPeriod.period} disembunyikan dari website.`
           : `Periode ${currentPeriod.period} ditampilkan di website.`,
-      );
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Status periode gagal disimpan.",
@@ -207,9 +267,18 @@ export function ProgramsManager({
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+    void requestProgramsData(controller.signal, {
+      onSuccess: (result) => {
+        setItems(result.items);
+        setPeriods(result.periods);
+        setCounts(result.counts ?? null);
+        setError("");
+      },
+      onError: setError,
+      onFinally: () => setLoading(false),
+    });
     return () => controller.abort();
-  }, [load]);
+  }, []);
 
   async function remove(item: Program) {
     if (
@@ -223,7 +292,7 @@ export function ProgramsManager({
     inFlight.current = true;
     setBusy(true);
     setError("");
-    setNotice("");
+    setNotice(null);
     try {
       await requestJson("/api/admin/programs", {
         method: "DELETE",
@@ -232,9 +301,10 @@ export function ProgramsManager({
       });
       if (editing !== "new" && editing?.id === item.id) {
         setEditing(null);
-        setSavedDialogNotice("");
       }
-      setNotice("Program kerja berhasil dihapus.");
+      if (formProgramId === item.id) setFormProgramId("");
+      if (participantProgramId === item.id) setParticipantProgramId("");
+      setNotice({ text: "Program kerja berhasil dihapus." });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Program gagal dihapus.");
@@ -272,7 +342,7 @@ export function ProgramsManager({
             aria-controls={`programs-panel-${tab.id}`}
             aria-selected={activeTab === tab.id}
             tabIndex={activeTab === tab.id ? 0 : -1}
-            disabled={busy || registrationsBusy}
+            disabled={busy || registrationsBusy || formSettingsBusy}
             onClick={() => selectSectionTab(tab.id)}
             onKeyDown={(event) => {
               let next: number;
@@ -293,6 +363,7 @@ export function ProgramsManager({
       </div>
 
       <div
+        ref={programsPanel}
         role="tabpanel"
         id="programs-panel-programs"
         aria-labelledby="programs-tab-programs"
@@ -315,7 +386,7 @@ export function ProgramsManager({
               onClick={() => {
                 setAddingPeriod(true);
                 setPeriodError("");
-                setNotice("");
+                setNotice(null);
               }}
             >
               Tambah periode
@@ -325,9 +396,8 @@ export function ProgramsManager({
               className="admin-button primary"
               disabled={busy}
               onClick={() => {
-                setSavedDialogNotice("");
                 setEditing("new");
-                setNotice("");
+                setNotice(null);
               }}
             >
               Tambah program
@@ -342,9 +412,26 @@ export function ProgramsManager({
           </p>
         )}
         {notice && (
-          <p className="admin-success" role="status">
-            {notice}
-          </p>
+          <div className="admin-success admin-notice-banner" role="status">
+            <p>{notice.text}</p>
+            {notice.actionProgram && (
+              <button
+                type="button"
+                className="admin-button"
+                disabled={busy}
+                onClick={() => {
+                  const targetId = notice.actionProgram!.id;
+                  setNotice(null);
+                  selectSectionTab("form-settings", {
+                    programId: targetId,
+                    focusPanel: true,
+                  });
+                }}
+              >
+                {`Atur formulir ${notice.actionProgram.title}`}
+              </button>
+            )}
+          </div>
         )}
         {error && (
           <div className="admin-error" role="alert">
@@ -369,7 +456,6 @@ export function ProgramsManager({
             busy={busy}
             onClose={() => {
               setEditing(null);
-              setSavedDialogNotice("");
             }}
             title={
               editing === "new" ? "Tambah program kerja" : "Edit program kerja"
@@ -379,29 +465,26 @@ export function ProgramsManager({
               key={editing === "new" ? "new" : editing.id}
               item={editing === "new" ? null : editing}
               initialPeriod={currentPeriod?.period || ""}
-              savedNotice={savedDialogNotice}
               onBusy={setBusy}
               onCancel={() => {
                 setEditing(null);
-                setSavedDialogNotice("");
               }}
               onSaved={async (savedItem) => {
-                const showLinkInDialog =
+                const shouldOfferFormSetup =
                   savedItem.registrationMode === "internal" &&
                   (editing === "new" ||
                     editing.registrationMode !== "internal");
+                setEditing(null);
                 await load();
                 setPeriod(savedItem.period);
                 setBusy(false);
-                if (showLinkInDialog) {
-                  setEditing(savedItem);
-                  setSavedDialogNotice(
-                    "Program kerja berhasil disimpan. Gunakan tautan pendaftaran publik di bawah ini.",
-                  );
+                if (shouldOfferFormSetup) {
+                  setNotice({
+                    text: `Program kerja ${savedItem.title} berhasil disimpan. Lanjutkan atur kuota, tautan grup, dan kolom formulir pada tab Atur formulir.`,
+                    actionProgram: { id: savedItem.id, title: savedItem.title },
+                  });
                 } else {
-                  setEditing(null);
-                  setSavedDialogNotice("");
-                  setNotice("Program kerja berhasil disimpan.");
+                  setNotice({ text: "Program kerja berhasil disimpan." });
                 }
               }}
             />
@@ -570,6 +653,12 @@ export function ProgramsManager({
                   item={item}
                   count={counts !== null ? (counts[item.id] ?? 0) : null}
                   busy={busy}
+                  onConfigureForm={() =>
+                    selectSectionTab("form-settings", {
+                      programId: item.id,
+                      focusPanel: true,
+                    })
+                  }
                   onViewParticipants={() =>
                     selectSectionTab("registrations", {
                       programId: item.id,
@@ -577,9 +666,8 @@ export function ProgramsManager({
                     })
                   }
                   onEdit={() => {
-                    setSavedDialogNotice("");
                     setEditing(item);
-                    setNotice("");
+                    setNotice(null);
                   }}
                   onDelete={() => void remove(item)}
                 />
@@ -587,6 +675,47 @@ export function ProgramsManager({
             </div>
           )}
         </div>
+      </div>
+
+      <div
+        ref={formSettingsPanel}
+        role="tabpanel"
+        id="programs-panel-form-settings"
+        aria-labelledby="programs-tab-form-settings"
+        hidden={activeTab !== "form-settings"}
+        tabIndex={0}
+      >
+        {activeTab === "form-settings" && (
+          <ProgramFormSettingsManager
+            items={items}
+            loading={loading}
+            error={error}
+            selectedProgramId={formProgramId}
+            onProgramIdChange={handleFormProgramChange}
+            onReload={() => {
+              setLoading(true);
+              void load();
+            }}
+            onSaved={async (savedItem) => {
+              setItems((prev) =>
+                prev.map((entry) =>
+                  entry.id === savedItem.id ? savedItem : entry,
+                ),
+              );
+              await load();
+            }}
+            onBusyChange={setFormSettingsBusy}
+            onOpenProgramsTab={() =>
+              selectSectionTab("programs", { focusPanel: true })
+            }
+            onOpenParticipants={(programId) =>
+              selectSectionTab("registrations", {
+                programId,
+                focusPanel: true,
+              })
+            }
+          />
+        )}
       </div>
 
       <div
@@ -614,6 +743,7 @@ export function ProgramListRow({
   item,
   count,
   busy = false,
+  onConfigureForm,
   onViewParticipants,
   onEdit,
   onDelete,
@@ -621,6 +751,7 @@ export function ProgramListRow({
   item: Program;
   count: number | null;
   busy?: boolean;
+  onConfigureForm?: () => void;
   onViewParticipants: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -683,6 +814,17 @@ export function ProgramListRow({
         </div>
       </div>
       <div className="admin-actions">
+        {item.registrationMode === "internal" && (
+          <button
+            type="button"
+            className="admin-button"
+            disabled={busy}
+            aria-label={`Atur formulir ${item.title}`}
+            onClick={onConfigureForm}
+          >
+            Atur formulir
+          </button>
+        )}
         <button
           type="button"
           className="admin-button"
@@ -755,14 +897,12 @@ const fields = [
 export function ProgramEditor({
   item,
   initialPeriod,
-  savedNotice,
   onCancel,
   onSaved,
   onBusy,
 }: {
   item: Program | null;
   initialPeriod: string;
-  savedNotice: string;
   onCancel: () => void;
   onSaved: (item: Program) => Promise<void>;
   onBusy: (busy: boolean) => void;
@@ -775,19 +915,6 @@ export function ProgramEditor({
   const [registrationMode, setRegistrationMode] =
     useState<ProgramRegistrationMode>(item?.registrationMode || "external");
   const [gformLink, setGformLink] = useState(item?.gformLink || "");
-  const [registrationMaxQuota, setRegistrationMaxQuota] = useState(
-    item?.registrationMaxQuota != null ? String(item.registrationMaxQuota) : "",
-  );
-  const [registrationGroupLink, setRegistrationGroupLink] = useState(
-    item?.registrationGroupLink || "",
-  );
-  const [registrationFormConfig, setRegistrationFormConfig] =
-    useState<ProgramFormConfig>(() =>
-      normalizeProgramFormConfig(item?.registrationFormConfig),
-    );
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState("");
-  const copyTimer = useRef<number | null>(null);
 
   const [selected, setSelected] = useState<{
     url: string;
@@ -812,17 +939,8 @@ export function ProgramEditor({
     },
     [selected],
   );
-  useEffect(
-    () => () => {
-      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-    },
-    [],
-  );
 
   const preview = selected?.url || (!removeImage ? item?.imageUrl : null);
-  const publicRegistrationPath = item
-    ? `/program-kerja/${item.id}/daftar`
-    : "";
 
   function resetPhoto() {
     setSelected(null);
@@ -830,42 +948,9 @@ export function ProgramEditor({
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  async function copyPublicLink(path: string) {
-    setCopyError("");
-    const fullUrl =
-      typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error("Clipboard tidak tersedia");
-      }
-      await navigator.clipboard.writeText(fullUrl);
-      setCopied(true);
-      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-      copyTimer.current = window.setTimeout(() => setCopied(false), 2500);
-    } catch {
-      setCopyError(`Salin tautan berikut secara manual: ${fullUrl}`);
-    }
-  }
-
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (photoError || saving || submitting.current) return;
-    let validatedFormConfig: ProgramFormConfig;
-    try {
-      validatedFormConfig =
-        registrationMode === "internal"
-          ? validateProgramFormConfig(registrationFormConfig)
-          : item?.registrationFormConfig
-            ? normalizeProgramFormConfig(item.registrationFormConfig)
-            : cloneDefaultProgramFormConfig();
-    } catch (err) {
-      setError(
-        err instanceof ValidationError
-          ? err.message
-          : "Konfigurasi formulir pendaftaran tidak valid.",
-      );
-      return;
-    }
     const form = new FormData(event.currentTarget);
     const data: Record<string, unknown> = {
       sortOrder: Number(form.get("sortOrder")),
@@ -874,11 +959,11 @@ export function ProgramEditor({
       icon: form.get("icon"),
       registrationMode,
       gformLink: registrationMode === "external" ? gformLink : "",
-      registrationGroupLink:
-        registrationMode === "internal" ? registrationGroupLink : "",
-      registrationMaxQuota:
-        registrationMode === "internal" ? registrationMaxQuota : "",
-      registrationFormConfig: validatedFormConfig,
+      registrationGroupLink: item?.registrationGroupLink ?? "",
+      registrationMaxQuota: item?.registrationMaxQuota ?? "",
+      registrationFormConfig: item?.registrationFormConfig
+        ? normalizeProgramFormConfig(item.registrationFormConfig)
+        : cloneDefaultProgramFormConfig(),
     };
     for (const field of fields) {
       const value = String(form.get(field.key) || "");
@@ -913,15 +998,6 @@ export function ProgramEditor({
         resetPhoto();
         setRemoveImage(false);
         setGformLink(result.item.gformLink);
-        setRegistrationMaxQuota(
-          result.item.registrationMaxQuota != null
-            ? String(result.item.registrationMaxQuota)
-            : "",
-        );
-        setRegistrationGroupLink(result.item.registrationGroupLink);
-        setRegistrationFormConfig(
-          normalizeProgramFormConfig(result.item.registrationFormConfig),
-        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Program gagal disimpan.");
@@ -934,11 +1010,6 @@ export function ProgramEditor({
 
   return (
     <form className="admin-form" onSubmit={submit} aria-busy={saving}>
-      {savedNotice && (
-        <p className="admin-success" role="status">
-          {savedNotice}
-        </p>
-      )}
       <fieldset disabled={saving}>
         {fields.map((field) => {
           const value = item?.[field.key];
@@ -1030,93 +1101,10 @@ export function ProgramEditor({
             </small>
           </label>
         ) : (
-          <>
-            <div className="admin-form-columns">
-              <label>
-                Kuota maksimal peserta (opsional)
-                <input
-                  name="registrationMaxQuota"
-                  type="number"
-                  min={1}
-                  max={2147483647}
-                  step={1}
-                  inputMode="numeric"
-                  placeholder="Tanpa batas"
-                  value={registrationMaxQuota}
-                  onChange={(event) =>
-                    setRegistrationMaxQuota(event.target.value)
-                  }
-                />
-                <small>Kosongkan jika kuota peserta tidak dibatasi.</small>
-              </label>
-              <label>
-                Tautan grup WA/LINE peserta (opsional)
-                <input
-                  name="registrationGroupLink"
-                  type="url"
-                  maxLength={2000}
-                  placeholder="https://line.me/ti/g/..."
-                  value={registrationGroupLink}
-                  onChange={(event) =>
-                    setRegistrationGroupLink(event.target.value)
-                  }
-                />
-                <small>
-                  Ditampilkan kepada peserta setelah formulir berhasil dikirim.
-                </small>
-              </label>
-            </div>
-            <ProgramFormBuilder
-              value={registrationFormConfig}
-              onChange={setRegistrationFormConfig}
-              disabled={saving}
-            />
-            {item ? (
-              <div className="admin-registration-link-box">
-                <strong>Tautan formulir pendaftaran publik</strong>
-                <p className="admin-registration-link-path">
-                  {publicRegistrationPath}
-                </p>
-                <div className="admin-actions">
-                  <a
-                    className="admin-button"
-                    href={publicRegistrationPath}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Buka halaman
-                  </a>
-                  <button
-                    type="button"
-                    className="admin-button"
-                    onClick={() => void copyPublicLink(publicRegistrationPath)}
-                  >
-                    {copied ? "Tautan tersalin" : "Salin tautan"}
-                  </button>
-                </div>
-                {copied && (
-                  <span className="sr-only" role="status">
-                    Tautan formulir pendaftaran berhasil disalin.
-                  </span>
-                )}
-                {copyError && (
-                  <p className="admin-error" role="alert">
-                    {copyError}
-                  </p>
-                )}
-                <small>
-                  Peserta dapat mengakses halaman ini setelah program dan
-                  periode dipublikasikan dengan status Pendaftaran Dibuka.
-                </small>
-              </div>
-            ) : (
-              <p className="admin-notice">
-                Setelah program disimpan, tautan formulir publik
-                (/program-kerja/[id]/daftar) dengan tombol Buka halaman dan
-                Salin tautan akan muncul di sini.
-              </p>
-            )}
-          </>
+          <p className="admin-notice">
+            Kuota peserta, tautan grup WA/LINE, tautan halaman publik, dan kolom
+            formulir custom diatur terpisah pada tab Atur formulir.
+          </p>
         )}
         <div className="admin-form-columns">
           <label>
@@ -1261,7 +1249,7 @@ export function ProgramEditor({
             </PendingLabel>
           </button>
           <button className="admin-button" type="button" onClick={onCancel}>
-            {savedNotice ? "Tutup" : "Batal"}
+            Batal
           </button>
         </div>
       </fieldset>
