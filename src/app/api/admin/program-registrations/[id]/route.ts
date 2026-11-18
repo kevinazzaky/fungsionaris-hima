@@ -1,4 +1,5 @@
 import { AccessError, requireAdmin } from "@/data/auth";
+import { programRepository } from "@/data/repositories/programs";
 import { programRegistrationRepository } from "@/data/repositories/program-registrations";
 import {
   handleAdminProgramRegistrationDelete,
@@ -18,8 +19,18 @@ export async function PATCH(request: Request, context: Context) {
     {
       requireAdmin,
       isAccessError: (error) => error instanceof AccessError,
-      updateProgramRegistration: (targetId, body) =>
-        updateProgramRegistration(programRegistrationRepository, targetId, body),
+      programRepository,
+      updateProgramRegistration: (
+        targetId,
+        body,
+        progRepo = programRepository,
+      ) =>
+        updateProgramRegistration(
+          programRegistrationRepository,
+          targetId,
+          body,
+          progRepo,
+        ),
     },
   );
 }

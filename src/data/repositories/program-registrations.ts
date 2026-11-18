@@ -2,18 +2,32 @@ import "server-only";
 import { getPrisma } from "@/data/prisma";
 import { ValidationError } from "@/domain/admin";
 import {
+  normalizeProgramFormConfig,
+  normalizeStoredCustomResponses,
+} from "@/domain/program-form-config";
+import {
   ConflictError,
   NotFoundError,
+  validateProgramRegistrationInput,
+  type ProgramRegistration,
   type ProgramRegistrationRepository,
 } from "@/domain/program-registrations";
 import {
   Prisma,
+  type ProgramRegistration as ProgramRegistrationRow,
   type ProgramRegistrationMode,
   type ProgramStatus,
 } from "@/generated/prisma/client";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function presentRegistration(row: ProgramRegistrationRow): ProgramRegistration {
+  return {
+    ...row,
+    customResponses: normalizeStoredCustomResponses(row.customResponses),
+  };
+}
 
 export const programRegistrationRepository: ProgramRegistrationRepository = {
   async create(programId, input) {
@@ -28,6 +42,7 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
             status: ProgramStatus;
             registrationMode: ProgramRegistrationMode;
             registrationMaxQuota: number | null;
+            registrationFormConfig: unknown;
             isPublished: boolean;
             periodPublished: boolean;
           }[]
@@ -37,6 +52,7 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
             p.status,
             p."registrationMode",
             p."registrationMaxQuota",
+            p."registrationFormConfig",
             p."isPublished",
             pp."isPublished" AS "periodPublished"
           FROM "Program" p
@@ -59,6 +75,12 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
           throw new ValidationError(
             "Pendaftaran program kerja ini sudah ditutup.",
           );
+
+        const formConfig = normalizeProgramFormConfig(
+          program.registrationFormConfig,
+        );
+        const validated = validateProgramRegistrationInput(input, formConfig);
+
         if (program.registrationMaxQuota !== null) {
           const registered = await tx.programRegistration.count({
             where: { programId },
@@ -69,18 +91,21 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
               "quota",
             );
         }
-        return await tx.programRegistration.create({
+        const created = await tx.programRegistration.create({
           data: {
             programId,
-            nama: input.nama,
-            nim: input.nim,
-            angkatan: input.angkatan,
-            noHp: input.noHp,
-            idLine: input.idLine,
-            email: input.email,
-            catatan: input.catatan,
+            nama: validated.nama,
+            nim: validated.nim,
+            angkatan: validated.angkatan,
+            noHp: validated.noHp,
+            idLine: validated.idLine,
+            email: validated.email,
+            catatan: validated.catatan,
+            customResponses:
+              validated.customResponses as unknown as Prisma.InputJsonValue,
           },
         });
+        return presentRegistration(created);
       });
     } catch (error) {
       if (
@@ -97,7 +122,10 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
   },
   async get(id) {
     if (!UUID_PATTERN.test(id)) return null;
-    return getPrisma().programRegistration.findUnique({ where: { id } });
+    const row = await getPrisma().programRegistration.findUnique({
+      where: { id },
+    });
+    return row ? presentRegistration(row) : null;
   },
   async list(filter) {
     const programId = filter?.programId?.trim();
@@ -128,7 +156,7 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
       orderBy: [{ submittedAt: "desc" }, { id: "asc" }],
     });
     return rows.map(({ program, ...row }) => ({
-      ...row,
+      ...presentRegistration(row),
       programTitle: program.title,
       programPeriod: program.period,
     }));
@@ -137,7 +165,7 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
     if (!UUID_PATTERN.test(id))
       throw new NotFoundError("Data pendaftar tidak ditemukan.");
     try {
-      return await getPrisma().programRegistration.update({
+      const updated = await getPrisma().programRegistration.update({
         where: { id },
         data: {
           nama: input.nama,
@@ -147,8 +175,12 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
           idLine: input.idLine,
           email: input.email,
           catatan: input.catatan,
+          customResponses: normalizeStoredCustomResponses(
+            input.customResponses,
+          ) as unknown as Prisma.InputJsonValue,
         },
       });
+      return presentRegistration(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002")
@@ -166,7 +198,9 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
     if (!UUID_PATTERN.test(id))
       throw new NotFoundError("Data pendaftar tidak ditemukan.");
     try {
-      return await getPrisma().programRegistration.delete({ where: { id } });
+      return presentRegistration(
+        await getPrisma().programRegistration.delete({ where: { id } }),
+      );
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  DEFAULT_PROGRAM_FORM_CONFIG,
+  formatCustomResponseValue,
+  normalizeProgramFormConfig,
+  normalizeStoredCustomResponses,
+  type CustomFormField,
+  type ProgramCustomResponses,
+  type ProgramFormConfig,
+} from "@/domain/program-form-config";
 import type { Program } from "@/domain/programs";
 import type { ProgramRegistrationListItem } from "@/domain/program-registrations";
 import { EditorDialog } from "./editor-dialog";
@@ -20,6 +29,64 @@ type ProgramRegistrationsResponse = {
   counts: Record<string, number>;
   programs: Program[];
 };
+
+export type ParticipantUpdatePayload = {
+  nama: string;
+  nim: string;
+  angkatan: string;
+  noHp: string;
+  idLine: string;
+  email: string;
+  catatan: string;
+  customResponses: ProgramCustomResponses;
+};
+
+export function formatCustomCellValue(
+  value: string | boolean | undefined,
+): string {
+  const formatted = formatCustomResponseValue(value);
+  return formatted || "-";
+}
+
+export function summarizeCustomResponses(
+  responses: ProgramCustomResponses | undefined,
+  formConfig: ProgramFormConfig,
+): {
+  count: number;
+  entries: { key: string; label: string; value: string }[];
+  preview: string;
+} {
+  const stored = normalizeStoredCustomResponses(responses);
+  const entries: { key: string; label: string; value: string }[] = [];
+  const knownIds = new Set<string>();
+
+  for (const field of formConfig.customFields) {
+    knownIds.add(field.id);
+    if (!Object.hasOwn(stored, field.id)) continue;
+    const raw = stored[field.id];
+    const formatted = formatCustomResponseValue(raw);
+    if (field.type === "checkbox" || formatted !== "") {
+      entries.push({ key: field.id, label: field.label, value: formatted });
+    }
+  }
+
+  for (const [key, raw] of Object.entries(stored)) {
+    if (knownIds.has(key)) continue;
+    const formatted = formatCustomResponseValue(raw);
+    if (typeof raw === "boolean" || formatted !== "") {
+      entries.push({ key, label: key, value: formatted });
+    }
+  }
+
+  return {
+    count: entries.length,
+    entries,
+    preview: entries
+      .slice(0, 2)
+      .map((entry) => `${entry.label}: ${entry.value}`)
+      .join(", "),
+  };
+}
 
 export function ProgramRegistrationsManager({
   programId,
@@ -118,15 +185,7 @@ export function ProgramRegistrationsManager({
 
   async function saveParticipant(
     id: string,
-    payload: {
-      nama: string;
-      nim: string;
-      angkatan: string;
-      noHp: string;
-      idLine: string;
-      email: string;
-      catatan: string;
-    },
+    payload: ParticipantUpdatePayload,
   ) {
     if (busy || inFlight.current) return;
     inFlight.current = true;
@@ -205,16 +264,26 @@ export function ProgramRegistrationsManager({
     }
   }
 
+  const programById = new Map(programs.map((program) => [program.id, program]));
   const totalAll = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  const selectedProgram = programs.find(
-    (program) => program.id === activeProgramId,
-  );
+  const selectedProgram = activeProgramId
+    ? programById.get(activeProgramId)
+    : undefined;
   const exportHref = activeProgramId
     ? `/api/admin/program-registrations/export?${new URLSearchParams({
         programId: activeProgramId,
       }).toString()}`
     : "/api/admin/program-registrations/export";
   const hasActiveFilter = Boolean(activeProgramId || query);
+
+  const selectedFormConfig = selectedProgram
+    ? normalizeProgramFormConfig(selectedProgram.registrationFormConfig)
+    : null;
+  const selectedItemFormConfig = selected
+    ? normalizeProgramFormConfig(
+        programById.get(selected.programId)?.registrationFormConfig,
+      )
+    : DEFAULT_PROGRAM_FORM_CONFIG;
 
   return (
     <>
@@ -366,7 +435,10 @@ export function ProgramRegistrationsManager({
               : "Peserta yang mendaftar melalui formulir internal program kerja akan tampil di sini."}
           </p>
           {hasActiveFilter && (
-            <div className="admin-actions" style={{ justifyContent: "center", marginTop: "1rem" }}>
+            <div
+              className="admin-actions"
+              style={{ justifyContent: "center", marginTop: "1rem" }}
+            >
               <button
                 type="button"
                 className="admin-button"
@@ -379,91 +451,19 @@ export function ProgramRegistrationsManager({
           )}
         </div>
       ) : (
-        <div
-          className="admin-participants-wrap"
-          role="region"
-          aria-label="Daftar peserta program kerja"
-        >
-          <table className="admin-participants-table">
-            <caption className="sr-only">Daftar peserta program kerja</caption>
-            <thead>
-              <tr>
-                <th scope="col">Peserta</th>
-                <th scope="col">Program kerja</th>
-                <th scope="col">Kontak</th>
-                <th scope="col">Waktu daftar (WITA)</th>
-                <th scope="col">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <span className="admin-cell-label" aria-hidden="true">
-                      Peserta
-                    </span>
-                    <strong>{item.nama}</strong>
-                    <p className="admin-meta">
-                      NIM {item.nim} · Angkatan {item.angkatan}
-                    </p>
-                  </td>
-                  <td>
-                    <span className="admin-cell-label" aria-hidden="true">
-                      Program kerja
-                    </span>
-                    <strong>{item.programTitle}</strong>
-                    <p className="admin-meta">Periode {item.programPeriod}</p>
-                  </td>
-                  <td>
-                    <span className="admin-cell-label" aria-hidden="true">
-                      Kontak
-                    </span>
-                    <p>HP/WA: {item.noHp || "Tidak tercatat"}</p>
-                    <p className="admin-meta">
-                      LINE: {item.idLine || "Tidak tercatat"}
-                    </p>
-                    {item.email && <p className="admin-meta">{item.email}</p>}
-                  </td>
-                  <td>
-                    <span className="admin-cell-label" aria-hidden="true">
-                      Waktu daftar (WITA)
-                    </span>
-                    <p>{formatDate(item.submittedAt)}</p>
-                    {item.catatan && (
-                      <p className="admin-meta">Catatan: {item.catatan}</p>
-                    )}
-                  </td>
-                  <td className="admin-participant-actions">
-                    <div className="admin-actions">
-                      <button
-                        type="button"
-                        className="admin-button"
-                        disabled={busy}
-                        aria-label={`Detail dan edit ${item.nama}`}
-                        onClick={() => {
-                          setDetailError("");
-                          setNotice("");
-                          setSelected(item);
-                        }}
-                      >
-                        Detail &amp; Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-button danger"
-                        disabled={busy}
-                        aria-label={`Hapus ${item.nama}`}
-                        onClick={() => void removeParticipant(item)}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ParticipantsTable
+          items={items}
+          programs={programs}
+          selectedProgram={selectedProgram}
+          selectedFormConfig={selectedFormConfig}
+          busy={busy}
+          onSelect={(item) => {
+            setDetailError("");
+            setNotice("");
+            setSelected(item);
+          }}
+          onRemove={(item) => void removeParticipant(item)}
+        />
       )}
       {selected && (
         <EditorDialog
@@ -477,6 +477,7 @@ export function ProgramRegistrationsManager({
           <ParticipantEditor
             key={selected.id}
             item={selected}
+            formConfig={selectedItemFormConfig}
             saving={busy}
             error={detailError}
             onCancel={() => {
@@ -491,40 +492,546 @@ export function ProgramRegistrationsManager({
   );
 }
 
-function ParticipantEditor({
+export function ParticipantsTable({
+  items,
+  programs,
+  selectedProgram,
+  selectedFormConfig,
+  busy = false,
+  onSelect,
+  onRemove,
+}: {
+  items: ProgramRegistrationAdminRow[];
+  programs: Program[];
+  selectedProgram?: Program;
+  selectedFormConfig?: ProgramFormConfig | null;
+  busy?: boolean;
+  onSelect: (item: ProgramRegistrationAdminRow) => void;
+  onRemove: (item: ProgramRegistrationAdminRow) => void;
+}) {
+  const programById = new Map(programs.map((program) => [program.id, program]));
+
+  if (selectedProgram && selectedFormConfig) {
+    const showAngkatan =
+      selectedFormConfig.builtInFields.angkatan !== "hidden" ||
+      items.some((row) => Boolean(row.angkatan));
+    const showNoHp =
+      selectedFormConfig.builtInFields.noHp !== "hidden" ||
+      items.some((row) => Boolean(row.noHp));
+    const showIdLine =
+      selectedFormConfig.builtInFields.idLine !== "hidden" ||
+      items.some((row) => Boolean(row.idLine));
+    const showEmail =
+      selectedFormConfig.builtInFields.email !== "hidden" ||
+      items.some((row) => Boolean(row.email));
+    const showCatatan =
+      selectedFormConfig.builtInFields.catatan !== "hidden" ||
+      items.some((row) => Boolean(row.catatan));
+    const showContactCol = showNoHp || showIdLine || showEmail;
+
+    return (
+      <div
+        className="admin-participants-wrap"
+        role="region"
+        aria-label="Daftar peserta program kerja"
+      >
+        <table className="admin-participants-table">
+          <caption className="sr-only">Daftar peserta program kerja</caption>
+          <thead>
+            <tr>
+              <th scope="col">Peserta</th>
+              {showContactCol && <th scope="col">Kontak</th>}
+              {showCatatan && <th scope="col">Catatan</th>}
+              {selectedFormConfig.customFields.map((field) => (
+                <th scope="col" key={field.id}>
+                  {field.label}
+                </th>
+              ))}
+              <th scope="col">Waktu daftar (WITA)</th>
+              <th scope="col">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => {
+              const hasVisibleAngkatan =
+                selectedFormConfig.builtInFields.angkatan !== "hidden" ||
+                Boolean(item.angkatan);
+              const contactLines: { key: string; text: string; muted: boolean }[] =
+                [];
+              if (
+                selectedFormConfig.builtInFields.noHp !== "hidden" ||
+                item.noHp
+              ) {
+                contactLines.push({
+                  key: "noHp",
+                  text: `HP/WA: ${item.noHp || "-"}`,
+                  muted: false,
+                });
+              }
+              if (
+                selectedFormConfig.builtInFields.idLine !== "hidden" ||
+                item.idLine
+              ) {
+                contactLines.push({
+                  key: "idLine",
+                  text: `LINE: ${item.idLine || "-"}`,
+                  muted: true,
+                });
+              }
+              if (
+                selectedFormConfig.builtInFields.email !== "hidden" ||
+                item.email
+              ) {
+                contactLines.push({
+                  key: "email",
+                  text: item.email || "Email: -",
+                  muted: true,
+                });
+              }
+
+              return (
+                <tr key={item.id}>
+                  <td>
+                    <span className="admin-cell-label" aria-hidden="true">
+                      Peserta
+                    </span>
+                    <strong>{item.nama}</strong>
+                    <p className="admin-meta">
+                      {showAngkatan && hasVisibleAngkatan
+                        ? `NIM ${item.nim} · Angkatan ${item.angkatan || "-"}`
+                        : `NIM ${item.nim}`}
+                    </p>
+                  </td>
+                  {showContactCol && (
+                    <td>
+                      <span className="admin-cell-label" aria-hidden="true">
+                        Kontak
+                      </span>
+                      {contactLines.length > 0 ? (
+                        contactLines.map((line) => (
+                          <p
+                            key={line.key}
+                            className={line.muted ? "admin-meta" : undefined}
+                          >
+                            {line.text}
+                          </p>
+                        ))
+                      ) : (
+                        <p className="admin-meta">-</p>
+                      )}
+                    </td>
+                  )}
+                  {showCatatan && (
+                    <td>
+                      <span className="admin-cell-label" aria-hidden="true">
+                        Catatan
+                      </span>
+                      <p className="admin-custom-cell-value">
+                        {item.catatan || "-"}
+                      </p>
+                    </td>
+                  )}
+                  {selectedFormConfig.customFields.map((field) => (
+                    <td key={field.id}>
+                      <span className="admin-cell-label" aria-hidden="true">
+                        {field.label}
+                      </span>
+                      <p className="admin-custom-cell-value">
+                        {formatCustomCellValue(item.customResponses?.[field.id])}
+                      </p>
+                    </td>
+                  ))}
+                  <td>
+                    <span className="admin-cell-label" aria-hidden="true">
+                      Waktu daftar (WITA)
+                    </span>
+                    <p>{formatDate(item.submittedAt)}</p>
+                  </td>
+                  <td className="admin-participant-actions">
+                    <div className="admin-actions">
+                      <button
+                        type="button"
+                        className="admin-button"
+                        disabled={busy}
+                        aria-label={`Detail dan edit ${item.nama}`}
+                        onClick={() => onSelect(item)}
+                      >
+                        Detail &amp; Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-button danger"
+                        disabled={busy}
+                        aria-label={`Hapus ${item.nama}`}
+                        onClick={() => onRemove(item)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="admin-participants-wrap"
+      role="region"
+      aria-label="Daftar peserta program kerja"
+    >
+      <table className="admin-participants-table">
+        <caption className="sr-only">Daftar peserta program kerja</caption>
+        <thead>
+          <tr>
+            <th scope="col">Peserta</th>
+            <th scope="col">Program kerja</th>
+            <th scope="col">Kontak</th>
+            <th scope="col">Jawaban custom</th>
+            <th scope="col">Waktu daftar (WITA)</th>
+            <th scope="col">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const itemConfig = normalizeProgramFormConfig(
+              programById.get(item.programId)?.registrationFormConfig,
+            );
+            const showAngkatan =
+              itemConfig.builtInFields.angkatan !== "hidden" ||
+              Boolean(item.angkatan);
+            const summary = summarizeCustomResponses(
+              item.customResponses,
+              itemConfig,
+            );
+            const contactLines: { key: string; text: string; muted: boolean }[] =
+              [];
+            if (itemConfig.builtInFields.noHp !== "hidden" || item.noHp) {
+              contactLines.push({
+                key: "noHp",
+                text: `HP/WA: ${item.noHp || "Tidak tercatat"}`,
+                muted: false,
+              });
+            }
+            if (itemConfig.builtInFields.idLine !== "hidden" || item.idLine) {
+              contactLines.push({
+                key: "idLine",
+                text: `LINE: ${item.idLine || "Tidak tercatat"}`,
+                muted: true,
+              });
+            }
+            if (item.email) {
+              contactLines.push({
+                key: "email",
+                text: item.email,
+                muted: true,
+              });
+            }
+
+            return (
+              <tr key={item.id}>
+                <td>
+                  <span className="admin-cell-label" aria-hidden="true">
+                    Peserta
+                  </span>
+                  <strong>{item.nama}</strong>
+                  <p className="admin-meta">
+                    {showAngkatan
+                      ? `NIM ${item.nim} · Angkatan ${item.angkatan || "-"}`
+                      : `NIM ${item.nim}`}
+                  </p>
+                </td>
+                <td>
+                  <span className="admin-cell-label" aria-hidden="true">
+                    Program kerja
+                  </span>
+                  <strong>{item.programTitle}</strong>
+                  <p className="admin-meta">Periode {item.programPeriod}</p>
+                </td>
+                <td>
+                  <span className="admin-cell-label" aria-hidden="true">
+                    Kontak
+                  </span>
+                  {contactLines.length > 0 ? (
+                    contactLines.map((line) => (
+                      <p
+                        key={line.key}
+                        className={line.muted ? "admin-meta" : undefined}
+                      >
+                        {line.text}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="admin-meta">Tidak diminta di form</p>
+                  )}
+                </td>
+                <td>
+                  <span className="admin-cell-label" aria-hidden="true">
+                    Jawaban custom
+                  </span>
+                  {summary.count > 0 ? (
+                    <>
+                      <p>
+                        <strong>{`${summary.count} jawaban custom`}</strong>
+                      </p>
+                      <p className="admin-meta admin-custom-cell-value">
+                        {summary.preview}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="admin-meta">-</p>
+                  )}
+                </td>
+                <td>
+                  <span className="admin-cell-label" aria-hidden="true">
+                    Waktu daftar (WITA)
+                  </span>
+                  <p>{formatDate(item.submittedAt)}</p>
+                  {item.catatan && (
+                    <p className="admin-meta">Catatan: {item.catatan}</p>
+                  )}
+                </td>
+                <td className="admin-participant-actions">
+                  <div className="admin-actions">
+                    <button
+                      type="button"
+                      className="admin-button"
+                      disabled={busy}
+                      aria-label={`Detail dan edit ${item.nama}`}
+                      onClick={() => onSelect(item)}
+                    >
+                      Detail &amp; Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-button danger"
+                      disabled={busy}
+                      aria-label={`Hapus ${item.nama}`}
+                      onClick={() => onRemove(item)}
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function renderCustomFieldInput(
+  field: CustomFormField,
+  value: string | boolean | undefined,
+  onChange: (nextValue: string | boolean) => void,
+) {
+  const requirementText = field.required ? "(wajib)" : "(opsional)";
+  const stringVal = typeof value === "string" ? value : "";
+
+  if (field.type === "checkbox") {
+    return (
+      <label key={field.id} className="admin-check">
+        <input
+          type="checkbox"
+          name={`custom_${field.id}`}
+          checked={value === true}
+          required={field.required}
+          onChange={(event) => onChange(event.currentTarget.checked)}
+        />
+        {`${field.label} ${requirementText}`}
+      </label>
+    );
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <label key={field.id}>
+        {`${field.label} ${requirementText}`}
+        <textarea
+          name={`custom_${field.id}`}
+          rows={3}
+          maxLength={500}
+          required={field.required}
+          placeholder={field.placeholder || undefined}
+          value={stringVal}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+    );
+  }
+
+  if (field.type === "select") {
+    const hasRemovedSavedOption =
+      stringVal !== "" && !field.options.includes(stringVal);
+    return (
+      <label key={field.id}>
+        {`${field.label} ${requirementText}`}
+        <select
+          name={`custom_${field.id}`}
+          required={field.required}
+          value={stringVal}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          <option value="">{`Pilih ${field.label}`}</option>
+          {hasRemovedSavedOption && (
+            <option value={stringVal}>
+              {`${stringVal} (opsi terdahulu - tidak tersedia)`}
+            </option>
+          )}
+          {field.options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+        {hasRemovedSavedOption && (
+          <small>
+            {`Nilai tersimpan sebelumnya: "${stringVal}" (tidak lagi tersedia pada daftar pilihan).`}
+          </small>
+        )}
+      </label>
+    );
+  }
+
+  if (field.type === "number") {
+    return (
+      <label key={field.id}>
+        {`${field.label} ${requirementText}`}
+        <input
+          name={`custom_${field.id}`}
+          type="text"
+          inputMode="decimal"
+          maxLength={30}
+          required={field.required}
+          placeholder={field.placeholder || undefined}
+          value={stringVal}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+    );
+  }
+
+  if (field.type === "date") {
+    return (
+      <label key={field.id}>
+        {`${field.label} ${requirementText}`}
+        <input
+          name={`custom_${field.id}`}
+          type="date"
+          required={field.required}
+          value={stringVal}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <label key={field.id}>
+      {`${field.label} ${requirementText}`}
+      <input
+        name={`custom_${field.id}`}
+        type="text"
+        maxLength={200}
+        required={field.required}
+        placeholder={field.placeholder || undefined}
+        value={stringVal}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+export function ParticipantEditor({
   item,
+  formConfig = DEFAULT_PROGRAM_FORM_CONFIG,
   saving,
   error,
   onCancel,
   onSubmit,
 }: {
   item: ProgramRegistrationAdminRow;
+  formConfig?: ProgramFormConfig;
   saving: boolean;
   error: string;
   onCancel: () => void;
-  onSubmit: (payload: {
-    nama: string;
-    nim: string;
-    angkatan: string;
-    noHp: string;
-    idLine: string;
-    email: string;
-    catatan: string;
-  }) => void;
+  onSubmit: (payload: ParticipantUpdatePayload) => void;
 }) {
+  const normalizedConfig = normalizeProgramFormConfig(formConfig);
+  const storedResponses = normalizeStoredCustomResponses(item.customResponses);
+
+  const [customResponses, setCustomResponses] =
+    useState<ProgramCustomResponses>(() => {
+      const initial: ProgramCustomResponses = {};
+      for (const field of normalizedConfig.customFields) {
+        const raw = storedResponses[field.id];
+        if (field.type === "checkbox") {
+          initial[field.id] = raw === true;
+        } else {
+          initial[field.id] = typeof raw === "string" ? raw : "";
+        }
+      }
+      return initial;
+    });
+
+  const activeCustomIds = new Set(
+    normalizedConfig.customFields.map((field) => field.id),
+  );
+  const orphanedResponses = Object.entries(storedResponses).filter(
+    ([key, val]) =>
+      !activeCustomIds.has(key) &&
+      (typeof val === "boolean" || val.trim() !== ""),
+  );
+
+  const builtIn = normalizedConfig.builtInFields;
+  const legacyHiddenBuiltIns = (
+    [
+      ["angkatan", "Angkatan", item.angkatan],
+      ["noHp", "No. HP / WA", item.noHp],
+      ["idLine", "ID LINE", item.idLine],
+      ["email", "Email", item.email],
+      ["catatan", "Catatan", item.catatan],
+    ] as const
+  ).filter(
+    ([key, , val]) => builtIn[key] === "hidden" && val.trim() !== "",
+  );
+
+  function updateCustomValue(fieldId: string, nextValue: string | boolean) {
+    setCustomResponses((prev) => ({
+      ...prev,
+      [fieldId]: nextValue,
+    }));
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     onSubmit({
       nama: String(form.get("nama") || ""),
       nim: String(form.get("nim") || ""),
-      angkatan: String(form.get("angkatan") || ""),
-      noHp: String(form.get("noHp") || ""),
-      idLine: String(form.get("idLine") || ""),
-      email: String(form.get("email") || ""),
-      catatan: String(form.get("catatan") || ""),
+      angkatan:
+        builtIn.angkatan === "hidden" ? "" : String(form.get("angkatan") || ""),
+      noHp: builtIn.noHp === "hidden" ? "" : String(form.get("noHp") || ""),
+      idLine:
+        builtIn.idLine === "hidden" ? "" : String(form.get("idLine") || ""),
+      email: builtIn.email === "hidden" ? "" : String(form.get("email") || ""),
+      catatan:
+        builtIn.catatan === "hidden" ? "" : String(form.get("catatan") || ""),
+      customResponses,
     });
   }
+
+  const showAngkatanInput = builtIn.angkatan !== "hidden";
+  const showNoHpInput = builtIn.noHp !== "hidden";
+  const showIdLineInput = builtIn.idLine !== "hidden";
+  const showEmailInput = builtIn.email !== "hidden";
+  const showCatatanInput = builtIn.catatan !== "hidden";
 
   return (
     <>
@@ -541,7 +1048,7 @@ function ParticipantEditor({
       <form className="admin-form" onSubmit={handleSubmit} aria-busy={saving}>
         <fieldset disabled={saving}>
           <label>
-            Nama lengkap
+            Nama lengkap (wajib)
             <input
               name="nama"
               type="text"
@@ -551,9 +1058,9 @@ function ParticipantEditor({
               defaultValue={item.nama}
             />
           </label>
-          <div className="admin-form-columns">
+          <div className={showAngkatanInput ? "admin-form-columns" : undefined}>
             <label>
-              NIM
+              NIM (wajib)
               <input
                 name="nim"
                 type="text"
@@ -566,60 +1073,120 @@ function ParticipantEditor({
               />
               <small>Masukkan 5 sampai 30 digit angka.</small>
             </label>
-            <label>
-              Angkatan
-              <input
-                name="angkatan"
-                type="text"
-                required
-                minLength={4}
-                maxLength={4}
-                inputMode="numeric"
-                pattern="(19|20)\d{2}"
-                defaultValue={item.angkatan}
-              />
-              <small>Tahun masuk 4 digit, misalnya 2024.</small>
-            </label>
+            {showAngkatanInput && (
+              <label>
+                {`Angkatan (${builtIn.angkatan === "required" ? "wajib" : "opsional"})`}
+                <input
+                  name="angkatan"
+                  type="text"
+                  required={builtIn.angkatan === "required"}
+                  minLength={4}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="(19|20)\d{2}"
+                  defaultValue={item.angkatan}
+                />
+                <small>Tahun masuk 4 digit, misalnya 2024.</small>
+              </label>
+            )}
           </div>
-          <div className="admin-form-columns">
+          {(showNoHpInput || showIdLineInput) && (
+            <div
+              className={
+                showNoHpInput && showIdLineInput
+                  ? "admin-form-columns"
+                  : undefined
+              }
+            >
+              {showNoHpInput && (
+                <label>
+                  {`No. HP / WA (${builtIn.noHp === "required" ? "wajib" : "opsional"})`}
+                  <input
+                    name="noHp"
+                    type="tel"
+                    maxLength={20}
+                    inputMode="tel"
+                    defaultValue={item.noHp}
+                  />
+                </label>
+              )}
+              {showIdLineInput && (
+                <label>
+                  {`ID LINE (${builtIn.idLine === "required" ? "wajib" : "opsional"})`}
+                  <input
+                    name="idLine"
+                    type="text"
+                    maxLength={64}
+                    defaultValue={item.idLine}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+          {showEmailInput && (
             <label>
-              No. HP / WA
+              {`Email (${builtIn.email === "required" ? "wajib" : "opsional"})`}
               <input
-                name="noHp"
-                type="tel"
-                maxLength={20}
-                inputMode="tel"
-                defaultValue={item.noHp}
+                name="email"
+                type="email"
+                maxLength={120}
+                defaultValue={item.email}
               />
             </label>
+          )}
+          {showCatatanInput && (
             <label>
-              ID LINE
-              <input
-                name="idLine"
-                type="text"
-                maxLength={64}
-                defaultValue={item.idLine}
+              {`Catatan (${builtIn.catatan === "required" ? "wajib" : "opsional"})`}
+              <textarea
+                name="catatan"
+                rows={3}
+                maxLength={300}
+                defaultValue={item.catatan}
               />
             </label>
-          </div>
-          <label>
-            Email
-            <input
-              name="email"
-              type="email"
-              maxLength={120}
-              defaultValue={item.email}
-            />
-          </label>
-          <label>
-            Catatan
-            <textarea
-              name="catatan"
-              rows={3}
-              maxLength={300}
-              defaultValue={item.catatan}
-            />
-          </label>
+          )}
+          {legacyHiddenBuiltIns.length > 0 && (
+            <div className="admin-legacy-responses">
+              <h3>Data bawaan terdahulu</h3>
+              <dl className="admin-details">
+                {legacyHiddenBuiltIns.map(([key, label, val]) => (
+                  <div key={key}>
+                    <dt>{`${label} (disembunyikan)`}</dt>
+                    <dd>{val}</dd>
+                  </div>
+                ))}
+              </dl>
+              <small>
+                Kolom ini disembunyikan pada formulir aktif. Menyimpan ulang
+                akan mengosongkan kolom tersembunyi.
+              </small>
+            </div>
+          )}
+          {normalizedConfig.customFields.length > 0 && (
+            <div className="admin-custom-responses-editor">
+              <h3>Pertanyaan tambahan custom</h3>
+              {normalizedConfig.customFields.map((field) =>
+                renderCustomFieldInput(
+                  field,
+                  customResponses[field.id],
+                  (nextValue) => updateCustomValue(field.id, nextValue),
+                ),
+              )}
+            </div>
+          )}
+          {orphanedResponses.length > 0 && (
+            <div className="admin-legacy-responses">
+              <h3>Jawaban kolom terdahulu</h3>
+              <dl className="admin-details">
+                {orphanedResponses.map(([key, val]) => (
+                  <div key={key}>
+                    <dt>{key}</dt>
+                    <dd>{formatCustomResponseValue(val)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           {error && (
             <p className="admin-error" role="alert">
               {error}

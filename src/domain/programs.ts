@@ -4,6 +4,11 @@ import {
   validatePeriod,
   ValidationError,
 } from "./admin";
+import {
+  cloneDefaultProgramFormConfig,
+  validateProgramFormConfig,
+  type ProgramFormConfig,
+} from "./program-form-config";
 
 export const PROGRAM_ICONS = {
   microphone: "Seminar",
@@ -38,6 +43,7 @@ export type ProgramInput = {
   registrationMode: ProgramRegistrationMode;
   registrationGroupLink: string;
   registrationMaxQuota: number | null;
+  registrationFormConfig: ProgramFormConfig;
   speakers: string[];
   price: string;
   benefits: string[];
@@ -50,6 +56,13 @@ export type Program = ProgramInput & {
   imagePath: string | null;
   imageUrl: string | null;
 };
+export type ProgramFormSettingsInput = Pick<
+  ProgramInput,
+  | "status"
+  | "registrationGroupLink"
+  | "registrationMaxQuota"
+  | "registrationFormConfig"
+>;
 export type ProgramPeriod = { period: string; isPublished: boolean };
 export interface ProgramPeriodRepository {
   list(): Promise<ProgramPeriod[]>;
@@ -127,22 +140,60 @@ function maxQuotaValue(value: unknown): number | null {
   return value;
 }
 
-export function validateProgram(data: Record<string, unknown>): ProgramInput {
-  const common = validateGallery({ ...data, alt: data.body });
-  const status = text(data.status, "Status");
-  const icon = text(data.icon, "Ikon");
+function registrationFormConfigValue(value: unknown): ProgramFormConfig {
+  if (value === undefined || value === null) {
+    return cloneDefaultProgramFormConfig();
+  }
+  if (typeof value === "string") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new ValidationError(
+        "Konfigurasi formulir pendaftaran tidak valid.",
+      );
+    }
+    return validateProgramFormConfig(parsed);
+  }
+  return validateProgramFormConfig(value);
+}
+
+function programStatusValue(value: unknown): ProgramInput["status"] {
+  const status = text(value, "Status");
   if (!Object.hasOwn(PROGRAM_STATUSES, status))
     throw new ValidationError("Status program tidak dikenal.");
+  return status as ProgramInput["status"];
+}
+
+export function validateProgramFormSettings(
+  data: Record<string, unknown>,
+): ProgramFormSettingsInput {
+  return {
+    status: programStatusValue(data.status),
+    registrationGroupLink: optionalHttpUrl(
+      data.registrationGroupLink,
+      "Tautan grup peserta",
+    ),
+    registrationMaxQuota: maxQuotaValue(data.registrationMaxQuota),
+    registrationFormConfig: registrationFormConfigValue(
+      data.registrationFormConfig,
+    ),
+  };
+}
+
+export function validateProgram(data: Record<string, unknown>): ProgramInput {
+  const common = validateGallery({ ...data, alt: data.body });
+  const formSettings = validateProgramFormSettings(data);
+  const icon = text(data.icon, "Ikon");
   if (!Object.hasOwn(PROGRAM_ICONS, icon))
     throw new ValidationError("Ikon program tidak dikenal.");
   const registrationMode = registrationModeValue(data.registrationMode);
   const gformLink = optionalHttpUrl(data.gformLink, "Tautan pendaftaran");
-  const registrationGroupLink = optionalHttpUrl(
-    data.registrationGroupLink,
-    "Tautan grup peserta",
-  );
-  const registrationMaxQuota = maxQuotaValue(data.registrationMaxQuota);
-  if (status === "open" && registrationMode === "external" && !gformLink)
+  if (
+    formSettings.status === "open" &&
+    registrationMode === "external" &&
+    !gformLink
+  )
     throw new ValidationError(
       "Isi tautan pendaftaran sebelum membuka pendaftaran program.",
     );
@@ -161,12 +212,13 @@ export function validateProgram(data: Record<string, unknown>): ProgramInput {
     executionDate: text(data.executionDate, "Jadwal pelaksanaan", 200, false),
     time: text(data.time, "Waktu", 200, false),
     location: text(data.location, "Lokasi", 300, false),
-    status: status as ProgramInput["status"],
+    status: formSettings.status,
     icon: icon as ProgramInput["icon"],
     gformLink,
     registrationMode,
-    registrationGroupLink,
-    registrationMaxQuota,
+    registrationGroupLink: formSettings.registrationGroupLink,
+    registrationMaxQuota: formSettings.registrationMaxQuota,
+    registrationFormConfig: formSettings.registrationFormConfig,
     speakers: lines(data.speakers, "Narasumber"),
     benefits: lines(data.benefits, "Benefit"),
     price: text(data.price, "Biaya", 200, false),

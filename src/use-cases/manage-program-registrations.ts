@@ -1,6 +1,12 @@
 import { ValidationError } from "../domain/admin";
 import {
+  DEFAULT_PROGRAM_FORM_CONFIG,
+  type ProgramCustomResponses,
+} from "../domain/program-form-config";
+import type { ProgramRepository } from "../domain/programs";
+import {
   ConflictError,
+  NotFoundError,
   validateProgramRegistrationAdminUpdate,
   type ProgramRegistrationListFilter,
   type ProgramRegistrationRepository,
@@ -22,15 +28,50 @@ export async function getProgramRegistrationCounts(
 }
 
 export async function updateProgramRegistration(
-  repository: Pick<ProgramRegistrationRepository, "update">,
+  repository: Pick<ProgramRegistrationRepository, "update"> &
+    Partial<Pick<ProgramRegistrationRepository, "get">>,
   id: string,
   data: Record<string, unknown>,
+  programRepository?: Pick<ProgramRepository, "get">,
 ) {
   if (typeof id !== "string" || !id.trim())
     throw new ValidationError("ID pendaftar tidak valid.");
-  const input = validateProgramRegistrationAdminUpdate(data);
+
+  let formConfig = DEFAULT_PROGRAM_FORM_CONFIG;
+  let existingCustomResponses: ProgramCustomResponses = {};
+
+  if (programRepository && typeof repository.get === "function") {
+    const existing = await repository.get(id);
+    if (!existing) {
+      throw new NotFoundError("Data pendaftar tidak ditemukan.");
+    }
+    existingCustomResponses = existing.customResponses;
+    const program = await programRepository.get(existing.programId);
+    if (program) {
+      formConfig = program.registrationFormConfig;
+    }
+  }
+
+  const input = validateProgramRegistrationAdminUpdate(data, formConfig);
+
+  const currentFieldIds = new Set(
+    formConfig.customFields.map((field) => field.id),
+  );
+  const mergedCustomResponses: ProgramCustomResponses = {};
+  for (const [key, value] of Object.entries(existingCustomResponses)) {
+    if (!currentFieldIds.has(key)) {
+      mergedCustomResponses[key] = value;
+    }
+  }
+  for (const [key, value] of Object.entries(input.customResponses)) {
+    mergedCustomResponses[key] = value;
+  }
+
   try {
-    return await repository.update(id, input);
+    return await repository.update(id, {
+      ...input,
+      customResponses: mergedCustomResponses,
+    });
   } catch (error) {
     if (
       typeof error === "object" &&

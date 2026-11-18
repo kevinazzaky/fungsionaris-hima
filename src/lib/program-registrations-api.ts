@@ -6,15 +6,15 @@ import {
   type ProgramRegistrationListFilter,
   type ProgramRegistrationListItem,
 } from "@/domain/program-registrations";
-import type { Program } from "@/domain/programs";
+import type { Program, ProgramRepository } from "@/domain/programs";
 import { hasSameOrigin } from "@/domain/request-origin";
 import { createProgramRegistrationsWorkbook } from "./program-registrations-export";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const PUBLIC_REGISTRATION_MAX_BYTES = 16 * 1024;
-export const ADMIN_REGISTRATION_MAX_BYTES = 32 * 1024;
+export const PUBLIC_REGISTRATION_MAX_BYTES = 32 * 1024;
+export const ADMIN_REGISTRATION_MAX_BYTES = 64 * 1024;
 
 export class PayloadTooLargeError extends Error {
   constructor(message = "Ukuran data permintaan terlalu besar.") {
@@ -157,6 +157,23 @@ export function handleProgramRegistrationError(
   );
 }
 
+function normalizeNullableFormField(
+  payload: Record<string, unknown>,
+  form: Pick<FormData, "get"> | undefined,
+  key: string,
+) {
+  if ((payload[key] === undefined || payload[key] === null) && form) {
+    const raw = form.get(key);
+    if (typeof raw === "string") {
+      payload[key] = raw.trim() === "" ? null : raw;
+    }
+    return;
+  }
+  if (typeof payload[key] === "string" && payload[key].trim() === "") {
+    payload[key] = null;
+  }
+}
+
 export function normalizeAdminProgramPayload(
   data: Record<string, unknown>,
   form?: Pick<FormData, "get">,
@@ -174,17 +191,8 @@ export function normalizeAdminProgramPayload(
       payload.registrationGroupLink = groupLink;
     }
   }
-  if (payload.registrationMaxQuota === undefined && form) {
-    const quota = form.get("registrationMaxQuota");
-    if (typeof quota === "string") {
-      payload.registrationMaxQuota = quota.trim() === "" ? null : quota;
-    }
-  } else if (
-    typeof payload.registrationMaxQuota === "string" &&
-    payload.registrationMaxQuota.trim() === ""
-  ) {
-    payload.registrationMaxQuota = null;
-  }
+  normalizeNullableFormField(payload, form, "registrationMaxQuota");
+  normalizeNullableFormField(payload, form, "registrationFormConfig");
   return payload;
 }
 
@@ -233,6 +241,11 @@ export async function handlePublicProgramRegistrationPost(
           nama: result.registration.nama,
           nim: result.registration.nim,
           angkatan: result.registration.angkatan,
+          noHp: result.registration.noHp,
+          idLine: result.registration.idLine,
+          email: result.registration.email,
+          catatan: result.registration.catatan,
+          customResponses: result.registration.customResponses,
           submittedAt: result.registration.submittedAt,
         },
         programTitle: result.programTitle,
@@ -287,9 +300,11 @@ export async function handleAdminProgramRegistrationsGet(
 export type AdminProgramRegistrationMutationDeps = {
   requireAdmin: () => Promise<unknown>;
   isAccessError?: (error: unknown) => boolean;
+  programRepository?: Pick<ProgramRepository, "get">;
   updateProgramRegistration: (
     id: string,
     data: Record<string, unknown>,
+    programRepository?: Pick<ProgramRepository, "get">,
   ) => Promise<ProgramRegistration>;
   deleteProgramRegistration: (id: string) => Promise<ProgramRegistration>;
 };
@@ -299,7 +314,10 @@ export async function handleAdminProgramRegistrationPatch(
   idOrPromise: string | Promise<string>,
   deps: Pick<
     AdminProgramRegistrationMutationDeps,
-    "requireAdmin" | "isAccessError" | "updateProgramRegistration"
+    | "requireAdmin"
+    | "isAccessError"
+    | "programRepository"
+    | "updateProgramRegistration"
   >,
 ): Promise<Response> {
   try {
@@ -313,7 +331,11 @@ export async function handleAdminProgramRegistrationPatch(
       ADMIN_REGISTRATION_MAX_BYTES,
       false,
     );
-    const item = await deps.updateProgramRegistration(id, body);
+    const item = await deps.updateProgramRegistration(
+      id,
+      body,
+      deps.programRepository,
+    );
     return jsonNoStore({ item }, 200);
   } catch (error) {
     return handleProgramRegistrationError(
@@ -355,6 +377,7 @@ export type AdminProgramRegistrationsExportDeps = {
   listProgramRegistrations: (
     filter?: ProgramRegistrationListFilter,
   ) => Promise<ProgramRegistrationListItem[]>;
+  programRepository?: Pick<ProgramRepository, "get" | "list">;
 };
 
 export async function handleAdminProgramRegistrationsExportGet(
@@ -367,8 +390,17 @@ export async function handleAdminProgramRegistrationsExportGet(
       new URL(request.url).searchParams.get("programId") || ""
     ).trim();
     const programId = rawProgramId ? parseUuidParam(rawProgramId) : undefined;
-    const items = await deps.listProgramRegistrations({ programId });
-    const workbook = createProgramRegistrationsWorkbook(items);
+    const [items, programs] = await Promise.all([
+      deps.listProgramRegistrations({ programId }),
+      deps.programRepository
+        ? programId
+          ? deps.programRepository
+              .get(programId)
+              .then((program) => (program ? [program] : []))
+          : deps.programRepository.list(false)
+        : Promise.resolve(undefined),
+    ]);
+    const workbook = createProgramRegistrationsWorkbook(items, programs);
     const dateStamp = new Date().toISOString().slice(0, 10);
     return new Response(new Uint8Array(workbook), {
       status: 200,

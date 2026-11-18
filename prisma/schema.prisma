@@ -121,10 +121,11 @@ model Program {
   status                ProgramStatus           @default(upcoming)
   icon                  String                  @default("code")
   gformLink             String                  @default("")
-  registrationMode      ProgramRegistrationMode @default(external)
-  registrationGroupLink String                  @default("")
-  registrationMaxQuota  Int?
-  speakers              String[]                @default([])
+  registrationMode       ProgramRegistrationMode @default(external)
+  registrationGroupLink  String                  @default("")
+  registrationMaxQuota   Int?
+  registrationFormConfig Json                    @default("{}")
+  speakers               String[]                @default([])
   benefits              String[]                @default([])
   price                 String                  @default("")
   contactPerson         String                  @default("")
@@ -147,8 +148,9 @@ model ProgramRegistration {
   noHp        String   @default("")
   idLine      String   @default("")
   email       String   @default("")
-  catatan     String   @default("")
-  submittedAt DateTime @default(now()) @db.Timestamptz(3)
+  catatan         String   @default("")
+  customResponses Json     @default("{}")
+  submittedAt     DateTime @default(now()) @db.Timestamptz(3)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   program     Program  @relation(fields: [programId], references: [id], onDelete: Restrict)
 
