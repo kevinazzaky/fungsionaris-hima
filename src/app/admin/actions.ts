@@ -5,6 +5,7 @@ import { clearAuthCookies, createAuthClient } from "@/data/supabase/server";
 import { getPrisma } from "@/data/prisma";
 import { isBackendConfigured } from "@/lib/backend-config";
 import { AccessError, requireAdmin } from "@/data/auth";
+import { clearVotingAdminLockCookie } from "@/lib/voting-admin-lock";
 import { passwordRepository } from "@/data/supabase/account";
 import { changePassword } from "@/use-cases/change-password";
 import { ValidationError } from "@/domain/admin";
@@ -65,6 +66,7 @@ export async function logout() {
     console.error("Supabase sign-out failed; clearing local session cookies.");
   }
   await clearAuthCookies();
+  await clearVotingAdminLockCookie();
   redirect("/admin/login");
 }
 
@@ -95,5 +97,6 @@ export async function changePasswordAction(
     console.error("Password changed; clearing local session cookies.");
   }
   await clearAuthCookies();
+  await clearVotingAdminLockCookie();
   redirect("/admin/login?password=updated");
 }
