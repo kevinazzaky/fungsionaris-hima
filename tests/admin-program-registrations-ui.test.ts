@@ -471,6 +471,92 @@ test("ParticipantEditor merender konfigurasi built-in, semua input custom, nilai
   assert.doesNotMatch(editorHtml, EM_DASH_PATTERN);
 });
 
+test("ParticipantEditor merender option fallback untuk nilai select terdahulu yang dihapus agar mudah diganti", () => {
+  const optionalSelectConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    customFields: [
+      {
+        id: "cf_kaos",
+        label: "Ukuran Kaos",
+        type: "select",
+        required: false,
+        placeholder: "",
+        options: ["S", "M", "L"],
+      },
+    ],
+  };
+
+  const staleHtml = renderToStaticMarkup(
+    createElement(ParticipantEditor, {
+      item: {
+        ...sampleParticipant,
+        customResponses: { cf_kaos: "XXL" },
+      },
+      formConfig: optionalSelectConfig,
+      saving: false,
+      error: "",
+      onCancel: () => {},
+      onSubmit: () => {},
+    }),
+  );
+
+  assert.match(staleHtml, /Ukuran Kaos \(opsional\)/);
+  assert.ok(
+    staleHtml.includes(
+      '<option value="XXL" selected="">XXL (opsi terdahulu - tidak tersedia)</option>',
+    ),
+    "Fallback option for stale select value should be rendered and selected",
+  );
+  assert.ok(
+    staleHtml.includes('<option value="">Pilih Ukuran Kaos</option>'),
+    "Empty default option should stay unselected when stale option is active",
+  );
+  assert.ok(
+    staleHtml.includes(
+      "Nilai tersimpan sebelumnya: &quot;XXL&quot; (tidak lagi tersedia pada daftar pilihan).",
+    ),
+  );
+  assert.doesNotMatch(staleHtml, EM_DASH_PATTERN);
+
+  const validHtml = renderToStaticMarkup(
+    createElement(ParticipantEditor, {
+      item: {
+        ...sampleParticipant,
+        customResponses: { cf_kaos: "M" },
+      },
+      formConfig: optionalSelectConfig,
+      saving: false,
+      error: "",
+      onCancel: () => {},
+      onSubmit: () => {},
+    }),
+  );
+  assert.doesNotMatch(validHtml, /opsi terdahulu - tidak tersedia/);
+  assert.ok(validHtml.includes('<option value="M" selected="">M</option>'));
+  assert.doesNotMatch(validHtml, EM_DASH_PATTERN);
+
+  const emptyHtml = renderToStaticMarkup(
+    createElement(ParticipantEditor, {
+      item: {
+        ...sampleParticipant,
+        customResponses: {},
+      },
+      formConfig: optionalSelectConfig,
+      saving: false,
+      error: "",
+      onCancel: () => {},
+      onSubmit: () => {},
+    }),
+  );
+  assert.doesNotMatch(emptyHtml, /opsi terdahulu - tidak tersedia/);
+  assert.ok(
+    emptyHtml.includes(
+      '<option value="" selected="">Pilih Ukuran Kaos</option>',
+    ),
+  );
+  assert.doesNotMatch(emptyHtml, EM_DASH_PATTERN);
+});
+
 test("seluruh file Admin UI yang diubah bebas em dash dan memenuhi penjagaan aksesibilitas CSS", () => {
   const files = [
     "src/components/admin/program-form-builder.tsx",
@@ -493,7 +579,14 @@ test("seluruh file Admin UI yang diubah bebas em dash dan memenuhi penjagaan aks
     "utf8",
   );
   assert.match(css, /\.admin-form-builder/);
-  assert.match(css, /\.admin-custom-field-card/);
+  assert.match(
+    css,
+    /\.admin-custom-field-card\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-legacy-responses\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
   assert.match(css, /outline:\s*3px solid #805400/);
   assert.match(css, /min-height:\s*44px/);
 });

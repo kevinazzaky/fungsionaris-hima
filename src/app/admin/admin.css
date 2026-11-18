@@ -717,7 +717,7 @@
   gap: 0.9rem;
   min-width: 0;
   padding: 1rem;
-  border: 1px solid #d8d7cd;
+  border: 1px solid #8c8c82;
   border-radius: 0.85rem;
   background: #fff;
 }
@@ -745,7 +745,7 @@
   gap: 0.75rem;
   min-width: 0;
   padding: 0.95rem 1rem;
-  border: 1px solid #d8d7cd;
+  border: 1px solid #8c8c82;
   border-radius: 0.85rem;
   background: #fafaf8;
 }

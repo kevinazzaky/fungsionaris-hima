@@ -875,10 +875,15 @@ function renderCustomFieldInput(
         <select
           name={`custom_${field.id}`}
           required={field.required}
-          value={field.options.includes(stringVal) ? stringVal : ""}
+          value={stringVal}
           onChange={(event) => onChange(event.target.value)}
         >
           <option value="">{`Pilih ${field.label}`}</option>
+          {hasRemovedSavedOption && (
+            <option value={stringVal}>
+              {`${stringVal} (opsi terdahulu - tidak tersedia)`}
+            </option>
+          )}
           {field.options.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
