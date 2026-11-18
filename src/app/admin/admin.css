@@ -29,6 +29,67 @@
   border-top: 1px solid var(--admin-line);
   min-width: 0;
 }
+.admin-voting-lock {
+  max-width: 34rem;
+  padding: 1.5rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+.admin-voting-lock-header {
+  display: flex;
+  align-items: start;
+  gap: 0.9rem;
+  margin-bottom: 1.35rem;
+}
+.admin-voting-lock-header h2 {
+  font-size: 1.15rem;
+}
+.admin-voting-lock-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 0.65rem;
+  background: #fff8e6;
+  border: 1px solid #d4ad43;
+  color: #78350f;
+}
+.admin-pin-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.admin .admin-pin-input-wrap input {
+  border-color: #8c8c82;
+}
+.admin-pin-toggle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.65rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--admin-ink);
+  transition: background-color 0.18s, border-color 0.18s;
+}
+.admin-pin-toggle:hover {
+  background: #f5f5f1;
+  border-color: #62625b;
+}
+.admin-pin-toggle:focus-visible {
+  outline: 3px solid #805400;
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  .admin-voting-lock {
+    padding: 1.15rem;
+  }
+}
 .admin-voting-section > p {
   margin-block: 0.7rem;
 }

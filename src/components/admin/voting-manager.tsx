@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Key, Lock } from "@phosphor-icons/react/dist/ssr";
 import { EditorDialog } from "./editor-dialog";
-import { requestJson, formatDate } from "./request";
+import { AdminRequestError, requestJson, formatDate } from "./request";
+import { VotingPinField } from "./voting-pin-field";
 import { ProfileAvatar } from "@/components/ui/profile-avatar";
 import { CandidateVoteTotal } from "./candidate-vote-total";
 import {
@@ -22,7 +25,7 @@ type Preview = {
   issues: { row: number; message: string }[];
   sample: string[];
 };
-type Modal = "candidate" | "schedule" | "open" | "close" | "reset" | null;
+type Modal = "candidate" | "schedule" | "open" | "close" | "reset" | "pin" | null;
 
 function witaInput(date: Date) {
   return date
@@ -38,8 +41,20 @@ function witaInput(date: Date) {
     .replace(" ", "T");
 }
 
-export function VotingManager() {
+export function VotingManager({
+  initialPinUpdatedAt = null,
+}: {
+  initialPinUpdatedAt?: string | null;
+}) {
+  const router = useRouter();
+  const [locking, startLockTransition] = useTransition();
   const [data, setData] = useState<VotingDashboardData | null>(null);
+  const [pinUpdatedAt, setPinUpdatedAt] = useState<string | null>(
+    initialPinUpdatedAt,
+  );
+  const [currentPinInput, setCurrentPinInput] = useState("");
+  const [newPinInput, setNewPinInput] = useState("");
+  const [confirmPinInput, setConfirmPinInput] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
@@ -77,6 +92,52 @@ export function VotingManager() {
     ]),
   ].sort((a, b) => b.localeCompare(a, "id", { numeric: true }));
 
+  const clearLockedSession = useCallback(() => {
+    ++version.current;
+    setData(null);
+    setModal(null);
+    setCandidate(null);
+    setPreview(null);
+    setCsv("");
+    setLiveError("");
+    setMessage("");
+    startLockTransition(() => {
+      router.refresh();
+    });
+  }, [router]);
+
+  const handleLockedOrError = useCallback(
+    (e: unknown, fallback: string, setTargetError: (msg: string) => void) => {
+      if (e instanceof AdminRequestError && e.locked) {
+        clearLockedSession();
+        return true;
+      }
+      setTargetError(e instanceof Error ? e.message : fallback);
+      return false;
+    },
+    [clearLockedSession],
+  );
+
+  async function lockPanel() {
+    if (inFlight.current || locking) return;
+    inFlight.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await requestJson<{ unlocked: boolean }>("/api/admin/voting/pin", {
+        method: "DELETE",
+      });
+      clearLockedSession();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Penguncian akses belum berhasil.",
+      );
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
   async function load(id = selectedId) {
     const requestVersion = ++version.current;
     setLoading(true);
@@ -90,7 +151,7 @@ export function VotingManager() {
       }
     } catch (e) {
       if (requestVersion === version.current)
-        setError(e instanceof Error ? e.message : "Data tidak dapat dimuat.");
+        handleLockedOrError(e, "Data tidak dapat dimuat.", setError);
     } finally {
       if (requestVersion === version.current) setLoading(false);
     }
@@ -103,7 +164,7 @@ export function VotingManager() {
       })
       .catch((e) => {
         if (active)
-          setError(e instanceof Error ? e.message : "Data tidak dapat dimuat.");
+          handleLockedOrError(e, "Data tidak dapat dimuat.", setError);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -111,7 +172,7 @@ export function VotingManager() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [handleLockedOrError]);
 
   useEffect(() => {
     const id = election?.id;
@@ -134,12 +195,13 @@ export function VotingManager() {
           setLiveError("");
         }
       } catch (e) {
-        if (active && requestVersion === version.current)
-          setLiveError(
-            e instanceof Error
-              ? e.message
-              : "Pembaruan hasil gagal. Tekan Muat ulang.",
+        if (active && requestVersion === version.current) {
+          handleLockedOrError(
+            e,
+            "Pembaruan hasil gagal. Tekan Muat ulang.",
+            setLiveError,
           );
+        }
       } finally {
         pending = false;
       }
@@ -152,7 +214,7 @@ export function VotingManager() {
       controller.abort();
       window.removeEventListener("focus", refresh);
     };
-  }, [election?.id, election?.status, loading, busy, modal]);
+  }, [election?.id, election?.status, loading, busy, modal, handleLockedOrError]);
 
   function payload(action: string) {
     const form = new FormData();
@@ -193,7 +255,7 @@ export function VotingManager() {
       pageHeading.current?.focus({ preventScroll: true });
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Penyimpanan gagal.");
+      handleLockedOrError(e, "Penyimpanan gagal.", setError);
       return false;
     } finally {
       inFlight.current = false;
@@ -215,10 +277,71 @@ export function VotingManager() {
         }),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Preview gagal.");
+      handleLockedOrError(e, "Preview gagal.", setError);
     } finally {
       setBusy(false);
       inFlight.current = false;
+    }
+  }
+
+  function resetPinFields(clearError = true) {
+    setCurrentPinInput("");
+    setNewPinInput("");
+    setConfirmPinInput("");
+    if (clearError) setError("");
+  }
+
+  function closePinModal() {
+    resetPinFields(true);
+    setModal(null);
+  }
+
+  async function saveNewPin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (inFlight.current || locking) return;
+    if (
+      newPinInput.trim().length < 4 ||
+      newPinInput.length < 4 ||
+      newPinInput.length > 200
+    ) {
+      setError("PIN baru harus 4 sampai 200 karakter.");
+      return;
+    }
+    if (newPinInput !== confirmPinInput) {
+      setError("Konfirmasi PIN baru tidak cocok.");
+      return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await requestJson<{
+        updated: boolean;
+        pinUpdatedAt?: string | null;
+      }>("/api/admin/voting/pin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPin: currentPinInput,
+          newPin: newPinInput,
+          confirmPin: confirmPinInput,
+        }),
+      });
+      if (result.pinUpdatedAt !== undefined) {
+        setPinUpdatedAt(result.pinUpdatedAt);
+      }
+      resetPinFields(true);
+      setModal(null);
+      setMessage(
+        "PIN Pemilihan Ketua diperbarui. Sesi di browser lain otomatis dikunci.",
+      );
+      pageHeading.current?.focus({ preventScroll: true });
+    } catch (e) {
+      handleLockedOrError(e, "Penggantian PIN gagal.", setError);
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
     }
   }
   return (
@@ -230,19 +353,44 @@ export function VotingManager() {
           </h1>
           <p>Kelola kandidat, NIM terdaftar, dan periode pemilihan HIMA TI.</p>
         </div>
-        <button
-          className="admin-button"
-          type="button"
-          disabled={loading || busy}
-          onClick={() => {
-            setError("");
-            void load();
-          }}
-        >
-          <PendingLabel pending={loading} text="Memuat data…">
-            Muat ulang
-          </PendingLabel>
-        </button>
+        <div className="admin-actions">
+          <button
+            className="admin-button"
+            type="button"
+            disabled={busy || locking}
+            onClick={() => {
+              resetPinFields(true);
+              setModal("pin");
+            }}
+          >
+            <Key size={16} aria-hidden="true" />
+            Ganti PIN
+          </button>
+          <button
+            className="admin-button"
+            type="button"
+            disabled={busy || locking}
+            onClick={() => void lockPanel()}
+          >
+            <Lock size={16} aria-hidden="true" />
+            <PendingLabel pending={locking} text="Mengunci…">
+              Kunci Pemilihan Ketua
+            </PendingLabel>
+          </button>
+          <button
+            className="admin-button"
+            type="button"
+            disabled={loading || busy || locking}
+            onClick={() => {
+              setError("");
+              void load();
+            }}
+          >
+            <PendingLabel pending={loading} text="Memuat data…">
+              Muat ulang
+            </PendingLabel>
+          </button>
+        </div>
       </div>
       {message && (
         <p className="admin-success" role="status">
@@ -1071,6 +1219,77 @@ export function VotingManager() {
                 Reset suara percobaan
               </PendingLabel>
             </button>
+          </form>
+        </EditorDialog>
+      )}
+      {modal === "pin" && (
+        <EditorDialog
+          title="Ganti PIN Pemilihan Ketua"
+          busy={busy}
+          onClose={closePinModal}
+        >
+          <form
+            className="admin-form"
+            onSubmit={(event) => void saveNewPin(event)}
+            aria-busy={busy}
+          >
+            <fieldset disabled={busy}>
+              <p className="admin-meta">
+                Mengganti PIN akan langsung mengunci sesi Pemilihan Ketua di
+                browser atau perangkat lain.
+                {pinUpdatedAt
+                  ? ` Terakhir diperbarui: ${formatDate(pinUpdatedAt)} WITA.`
+                  : ""}
+              </p>
+              <VotingPinField
+                label="PIN saat ini"
+                name="currentPin"
+                value={currentPinInput}
+                onChange={setCurrentPinInput}
+                autoComplete="current-password"
+              />
+              <VotingPinField
+                label="PIN baru"
+                name="newPin"
+                value={newPinInput}
+                onChange={setNewPinInput}
+                minLength={4}
+                autoComplete="new-password"
+                helperText="Minimal 4 karakter (disarankan minimal 6 karakter acak) dan berbeda dari PIN saat ini."
+              />
+              <VotingPinField
+                label="Ulangi PIN baru"
+                name="confirmPin"
+                value={confirmPinInput}
+                onChange={setConfirmPinInput}
+                minLength={4}
+                autoComplete="new-password"
+              />
+              {error && (
+                <p className="admin-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="admin-actions">
+                <button
+                  className="admin-button"
+                  type="button"
+                  disabled={busy}
+                  onClick={closePinModal}
+                >
+                  Batal
+                </button>
+                <button
+                  className="admin-button admin-button-primary"
+                  type="submit"
+                  disabled={busy}
+                >
+                  <PendingLabel pending={busy} text="Menyimpan PIN…">
+                    Simpan PIN baru
+                  </PendingLabel>
+                </button>
+              </div>
+            </fieldset>
           </form>
         </EditorDialog>
       )}
