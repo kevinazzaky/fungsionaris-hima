@@ -16,13 +16,32 @@ import {
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
 import { PendingLabel } from "@/components/ui/pending-label";
-import { ProgramFormSettingsManager } from "./program-form-settings-manager";
+import {
+  confirmDiscardUnsavedFormSettings,
+  ProgramFormSettingsManager,
+} from "./program-form-settings-manager";
 import { ProgramRegistrationsManager } from "./program-registrations-manager";
 
 export type ProgramsManagerTab =
   | "programs"
   | "form-settings"
   | "registrations";
+
+export function canLeaveFormSettingsTab(
+  activeTab: ProgramsManagerTab,
+  nextTab: ProgramsManagerTab,
+  formSettingsDirty: boolean,
+  skipUnsavedConfirm = false,
+  confirmFn?: (message: string) => boolean,
+): boolean {
+  if (nextTab === activeTab || activeTab !== "form-settings") {
+    return true;
+  }
+  if (skipUnsavedConfirm) {
+    return true;
+  }
+  return confirmDiscardUnsavedFormSettings(formSettingsDirty, confirmFn);
+}
 
 type ProgramNotice = {
   text: string;
@@ -87,6 +106,7 @@ export function ProgramsManager({
     initialTab === "registrations" ? initialProgramId : "",
   );
   const [formSettingsBusy, setFormSettingsBusy] = useState(false);
+  const [formSettingsDirty, setFormSettingsDirty] = useState(false);
   const [registrationsBusy, setRegistrationsBusy] = useState(false);
 
   const [items, setItems] = useState<Program[]>([]);
@@ -140,6 +160,7 @@ export function ProgramsManager({
       programId?: string;
       focusTab?: boolean;
       focusPanel?: boolean;
+      skipUnsavedConfirm?: boolean;
     },
   ) {
     if (
@@ -150,6 +171,19 @@ export function ProgramsManager({
       addingPeriod
     ) {
       return;
+    }
+    if (
+      !canLeaveFormSettingsTab(
+        activeTab,
+        nextTab,
+        formSettingsDirty,
+        options?.skipUnsavedConfirm,
+      )
+    ) {
+      return;
+    }
+    if (nextTab !== activeTab && activeTab === "form-settings") {
+      setFormSettingsDirty(false);
     }
     let nextUrlProgramId = "";
     if (nextTab === "form-settings") {
@@ -705,6 +739,7 @@ export function ProgramsManager({
               await load();
             }}
             onBusyChange={setFormSettingsBusy}
+            onDirtyChange={setFormSettingsDirty}
             onOpenProgramsTab={() =>
               selectSectionTab("programs", { focusPanel: true })
             }
@@ -712,6 +747,7 @@ export function ProgramsManager({
               selectSectionTab("registrations", {
                 programId,
                 focusPanel: true,
+                skipUnsavedConfirm: true,
               })
             }
           />

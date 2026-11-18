@@ -12,6 +12,129 @@ import { PendingLabel } from "@/components/ui/pending-label";
 import { ProgramFormBuilder } from "./program-form-builder";
 import { requestJson } from "./request";
 
+export const UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE =
+  "Pengaturan formulir yang diubah belum disimpan. Buang perubahan dan lanjutkan?";
+
+export function confirmDiscardUnsavedFormSettings(
+  dirty: boolean,
+  confirmFn?: (message: string) => boolean,
+): boolean {
+  if (!dirty) return true;
+  if (confirmFn) return confirmFn(UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE);
+  if (typeof window === "undefined" || typeof window.confirm !== "function") {
+    return true;
+  }
+  return window.confirm(UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE);
+}
+
+export type ProgramFormSettingsDraft = {
+  status: Program["status"];
+  registrationMaxQuota: string;
+  registrationGroupLink: string;
+  registrationFormConfig: ProgramFormConfig;
+};
+
+export function createProgramFormSettingsDraft(
+  program: Program,
+): ProgramFormSettingsDraft {
+  return {
+    status: program.status,
+    registrationMaxQuota:
+      program.registrationMaxQuota != null
+        ? String(program.registrationMaxQuota)
+        : "",
+    registrationGroupLink: program.registrationGroupLink,
+    registrationFormConfig: normalizeProgramFormConfig(
+      program.registrationFormConfig,
+    ),
+  };
+}
+
+export function isProgramFormSettingsDirty(
+  draft: ProgramFormSettingsDraft,
+  baseline: Program,
+): boolean {
+  const baselineQuotaText =
+    baseline.registrationMaxQuota != null
+      ? String(baseline.registrationMaxQuota)
+      : "";
+  return (
+    draft.status !== baseline.status ||
+    draft.registrationMaxQuota.trim() !== baselineQuotaText ||
+    draft.registrationGroupLink.trim() !== baseline.registrationGroupLink.trim() ||
+    JSON.stringify(draft.registrationFormConfig) !==
+      JSON.stringify(
+        normalizeProgramFormConfig(baseline.registrationFormConfig),
+      )
+  );
+}
+
+export function areProgramFormSettingsEqual(
+  left: Program,
+  right: Program,
+): boolean {
+  return (
+    left.status === right.status &&
+    left.registrationMaxQuota === right.registrationMaxQuota &&
+    left.registrationGroupLink.trim() === right.registrationGroupLink.trim() &&
+    JSON.stringify(normalizeProgramFormConfig(left.registrationFormConfig)) ===
+      JSON.stringify(normalizeProgramFormConfig(right.registrationFormConfig))
+  );
+}
+
+export function syncProgramFormSettingsWithReload(
+  state: {
+    baseline: Program;
+    draft: ProgramFormSettingsDraft;
+  },
+  nextProgram: Program,
+): {
+  baseline: Program;
+  draft: ProgramFormSettingsDraft;
+  settingsChanged: boolean;
+  preservedDirtyDraft: boolean;
+} {
+  const dirty = isProgramFormSettingsDirty(state.draft, state.baseline);
+  const settingsChanged = !areProgramFormSettingsEqual(
+    state.baseline,
+    nextProgram,
+  );
+  if (dirty) {
+    return {
+      baseline: nextProgram,
+      draft: state.draft,
+      settingsChanged,
+      preservedDirtyDraft: true,
+    };
+  }
+  return {
+    baseline: nextProgram,
+    draft: createProgramFormSettingsDraft(nextProgram),
+    settingsChanged,
+    preservedDirtyDraft: false,
+  };
+}
+
+function useReportDirty(
+  dirty: boolean,
+  onDirtyChange?: (dirty: boolean) => void,
+) {
+  const callbackRef = useRef(onDirtyChange);
+  useEffect(() => {
+    callbackRef.current = onDirtyChange;
+  }, [onDirtyChange]);
+
+  useEffect(() => {
+    callbackRef.current?.(dirty);
+  }, [dirty]);
+
+  useEffect(() => {
+    return () => {
+      callbackRef.current?.(false);
+    };
+  }, []);
+}
+
 export type ProgramFormSettingsManagerProps = {
   items: Program[];
   loading?: boolean;
@@ -21,6 +144,7 @@ export type ProgramFormSettingsManagerProps = {
   onReload?: () => void;
   onSaved?: (item: Program) => Promise<void> | void;
   onBusyChange?: (busy: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
   onOpenProgramsTab?: () => void;
   onOpenParticipants?: (programId: string) => void;
 };
@@ -34,6 +158,7 @@ export function ProgramFormSettingsManager({
   onReload,
   onSaved,
   onBusyChange,
+  onDirtyChange,
   onOpenProgramsTab,
   onOpenParticipants,
 }: ProgramFormSettingsManagerProps) {
@@ -43,6 +168,7 @@ export function ProgramFormSettingsManager({
   const requestedProgramId =
     selectedProgramId !== undefined ? selectedProgramId : internalProgramId;
   const [saving, setSaving] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
 
   const internalPrograms = items.filter(
     (item) => item.registrationMode === "internal",
@@ -58,6 +184,9 @@ export function ProgramFormSettingsManager({
       internalPrograms.length > 0 &&
       !matchedProgram,
   );
+  const isDirty = Boolean(selectedProgram) && editorDirty;
+
+  useReportDirty(isDirty, onDirtyChange);
 
   function handleSavingChange(next: boolean) {
     setSaving(next);
@@ -65,6 +194,8 @@ export function ProgramFormSettingsManager({
   }
 
   function handleProgramChange(nextProgramId: string) {
+    if (nextProgramId === selectedProgram?.id) return;
+    if (!confirmDiscardUnsavedFormSettings(isDirty)) return;
     if (selectedProgramId === undefined) {
       setInternalProgramId(nextProgramId);
     }
@@ -88,7 +219,10 @@ export function ProgramFormSettingsManager({
                 type="button"
                 className="admin-button"
                 disabled={saving}
-                onClick={() => onOpenParticipants(selectedProgram.id)}
+                onClick={() => {
+                  if (!confirmDiscardUnsavedFormSettings(isDirty)) return;
+                  onOpenParticipants(selectedProgram.id);
+                }}
               >
                 Lihat peserta program ini
               </button>
@@ -96,6 +230,11 @@ export function ProgramFormSettingsManager({
               <a
                 className="admin-button"
                 href={`/admin/program-kerja?tab=peserta&programId=${encodeURIComponent(selectedProgram.id)}`}
+                onClick={(event) => {
+                  if (!confirmDiscardUnsavedFormSettings(isDirty)) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 Lihat peserta program ini
               </a>
@@ -189,6 +328,7 @@ export function ProgramFormSettingsManager({
               program={selectedProgram}
               saving={saving}
               onSavingChange={handleSavingChange}
+              onDirtyChange={setEditorDirty}
               onSaved={onSaved}
             />
           </>
@@ -202,11 +342,13 @@ function ProgramFormSettingsEditor({
   program,
   saving,
   onSavingChange,
+  onDirtyChange,
   onSaved,
 }: {
   program: Program;
   saving: boolean;
   onSavingChange: (busy: boolean) => void;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved?: (item: Program) => Promise<void> | void;
 }) {
   const accessHeadingId = useId();
@@ -215,24 +357,32 @@ function ProgramFormSettingsEditor({
   const mounted = useRef(true);
   const copyTimer = useRef<number | null>(null);
 
-  const [baseline, setBaseline] = useState<Program>(program);
-  const [status, setStatus] = useState<Program["status"]>(program.status);
-  const [registrationMaxQuota, setRegistrationMaxQuota] = useState(
-    program.registrationMaxQuota != null
-      ? String(program.registrationMaxQuota)
-      : "",
-  );
-  const [registrationGroupLink, setRegistrationGroupLink] = useState(
-    program.registrationGroupLink,
-  );
-  const [registrationFormConfig, setRegistrationFormConfig] =
-    useState<ProgramFormConfig>(() =>
-      normalizeProgramFormConfig(program.registrationFormConfig),
-    );
+  const [editorState, setEditorState] = useState<{
+    syncedProgram: Program;
+    baseline: Program;
+    draft: ProgramFormSettingsDraft;
+  }>(() => ({
+    syncedProgram: program,
+    baseline: program,
+    draft: createProgramFormSettingsDraft(program),
+  }));
   const [error, setError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
+
+  if (program !== editorState.syncedProgram) {
+    const synced = syncProgramFormSettingsWithReload(editorState, program);
+    setEditorState({
+      syncedProgram: program,
+      baseline: synced.baseline,
+      draft: synced.draft,
+    });
+    if (!synced.preservedDirtyDraft && synced.settingsChanged) {
+      setError("");
+      setSaveSuccess("");
+    }
+  }
 
   useEffect(() => {
     mounted.current = true;
@@ -243,18 +393,20 @@ function ProgramFormSettingsEditor({
   }, []);
 
   const publicRegistrationPath = `/program-kerja/${program.id}/daftar`;
-  const baselineQuotaText =
-    baseline.registrationMaxQuota != null
-      ? String(baseline.registrationMaxQuota)
-      : "";
-  const isDirty =
-    status !== baseline.status ||
-    registrationMaxQuota.trim() !== baselineQuotaText ||
-    registrationGroupLink.trim() !== baseline.registrationGroupLink ||
-    JSON.stringify(registrationFormConfig) !==
-      JSON.stringify(
-        normalizeProgramFormConfig(baseline.registrationFormConfig),
-      );
+  const { baseline, draft } = editorState;
+  const isDirty = isProgramFormSettingsDirty(draft, baseline);
+
+  useReportDirty(isDirty, onDirtyChange);
+
+  function updateDraft(
+    updater: (prev: ProgramFormSettingsDraft) => ProgramFormSettingsDraft,
+  ) {
+    setEditorState((prev) => ({
+      ...prev,
+      draft: updater(prev.draft),
+    }));
+    setSaveSuccess("");
+  }
 
   async function copyPublicLink(path: string) {
     setCopyError("");
@@ -274,16 +426,10 @@ function ProgramFormSettingsEditor({
   }
 
   function resetChanges() {
-    setStatus(baseline.status);
-    setRegistrationMaxQuota(
-      baseline.registrationMaxQuota != null
-        ? String(baseline.registrationMaxQuota)
-        : "",
-    );
-    setRegistrationGroupLink(baseline.registrationGroupLink);
-    setRegistrationFormConfig(
-      normalizeProgramFormConfig(baseline.registrationFormConfig),
-    );
+    setEditorState((prev) => ({
+      ...prev,
+      draft: createProgramFormSettingsDraft(prev.baseline),
+    }));
     setError("");
     setSaveSuccess("");
   }
@@ -294,7 +440,9 @@ function ProgramFormSettingsEditor({
 
     let validatedFormConfig: ProgramFormConfig;
     try {
-      validatedFormConfig = validateProgramFormConfig(registrationFormConfig);
+      validatedFormConfig = validateProgramFormConfig(
+        draft.registrationFormConfig,
+      );
     } catch (err) {
       setSaveSuccess("");
       setError(
@@ -305,7 +453,7 @@ function ProgramFormSettingsEditor({
       return;
     }
 
-    const trimmedQuota = registrationMaxQuota.trim();
+    const trimmedQuota = draft.registrationMaxQuota.trim();
     let parsedQuota: number | null = null;
     if (trimmedQuota !== "") {
       if (!/^\d+$/.test(trimmedQuota)) {
@@ -339,8 +487,8 @@ function ProgramFormSettingsEditor({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            status,
-            registrationGroupLink: registrationGroupLink.trim(),
+            status: draft.status,
+            registrationGroupLink: draft.registrationGroupLink.trim(),
             registrationMaxQuota: parsedQuota,
             registrationFormConfig: validatedFormConfig,
           }),
@@ -348,17 +496,11 @@ function ProgramFormSettingsEditor({
       );
       await onSaved?.(result.item);
       if (mounted.current) {
-        setBaseline(result.item);
-        setStatus(result.item.status);
-        setRegistrationMaxQuota(
-          result.item.registrationMaxQuota != null
-            ? String(result.item.registrationMaxQuota)
-            : "",
-        );
-        setRegistrationGroupLink(result.item.registrationGroupLink);
-        setRegistrationFormConfig(
-          normalizeProgramFormConfig(result.item.registrationFormConfig),
-        );
+        setEditorState((prev) => ({
+          ...prev,
+          baseline: result.item,
+          draft: createProgramFormSettingsDraft(result.item),
+        }));
         setSaveSuccess("Pengaturan formulir berhasil disimpan.");
       }
     } catch (err) {
@@ -398,10 +540,10 @@ function ProgramFormSettingsEditor({
               Status pendaftaran
               <select
                 name="status"
-                value={status}
+                value={draft.status}
                 onChange={(event) => {
-                  setStatus(event.target.value as Program["status"]);
-                  setSaveSuccess("");
+                  const nextStatus = event.target.value as Program["status"];
+                  updateDraft((prev) => ({ ...prev, status: nextStatus }));
                 }}
               >
                 {Object.entries(PROGRAM_STATUSES).map(([key, label]) => (
@@ -425,10 +567,13 @@ function ProgramFormSettingsEditor({
                 step={1}
                 inputMode="numeric"
                 placeholder="Tanpa batas"
-                value={registrationMaxQuota}
+                value={draft.registrationMaxQuota}
                 onChange={(event) => {
-                  setRegistrationMaxQuota(event.target.value);
-                  setSaveSuccess("");
+                  const nextQuota = event.target.value;
+                  updateDraft((prev) => ({
+                    ...prev,
+                    registrationMaxQuota: nextQuota,
+                  }));
                 }}
               />
               <small>Kosongkan jika kuota peserta tidak dibatasi.</small>
@@ -441,10 +586,13 @@ function ProgramFormSettingsEditor({
               type="url"
               maxLength={2000}
               placeholder="https://line.me/ti/g/..."
-              value={registrationGroupLink}
+              value={draft.registrationGroupLink}
               onChange={(event) => {
-                setRegistrationGroupLink(event.target.value);
-                setSaveSuccess("");
+                const nextLink = event.target.value;
+                updateDraft((prev) => ({
+                  ...prev,
+                  registrationGroupLink: nextLink,
+                }));
               }}
             />
             <small>
@@ -502,10 +650,12 @@ function ProgramFormSettingsEditor({
             </p>
           </div>
           <ProgramFormBuilder
-            value={registrationFormConfig}
+            value={draft.registrationFormConfig}
             onChange={(next) => {
-              setRegistrationFormConfig(next);
-              setSaveSuccess("");
+              updateDraft((prev) => ({
+                ...prev,
+                registrationFormConfig: next,
+              }));
             }}
             disabled={saving}
           />

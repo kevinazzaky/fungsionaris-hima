@@ -16,11 +16,19 @@ import {
   ProgramFormBuilder,
 } from "../src/components/admin/program-form-builder";
 import {
+  canLeaveFormSettingsTab,
   ProgramEditor,
   ProgramListRow,
   ProgramsManager,
 } from "../src/components/admin/programs-manager";
-import { ProgramFormSettingsManager } from "../src/components/admin/program-form-settings-manager";
+import {
+  confirmDiscardUnsavedFormSettings,
+  createProgramFormSettingsDraft,
+  isProgramFormSettingsDirty,
+  ProgramFormSettingsManager,
+  syncProgramFormSettingsWithReload,
+  UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE,
+} from "../src/components/admin/program-form-settings-manager";
 import {
   formatCustomCellValue,
   ParticipantEditor,
@@ -480,6 +488,150 @@ test("ProgramFormSettingsManager merender pemilih program internal, kartu pengat
   );
   assert.match(errorHtml, /Koneksi gagal\./);
   assert.match(errorHtml, /Muat ulang/);
+});
+
+test("penjagaan perubahan form settings yang belum disimpan dan sinkronisasi baseline saat reload bersih", () => {
+  let confirmCalls = 0;
+  let lastMessage = "";
+
+  assert.equal(
+    confirmDiscardUnsavedFormSettings(false, (message) => {
+      confirmCalls++;
+      lastMessage = message;
+      return false;
+    }),
+    true,
+  );
+  assert.equal(confirmCalls, 0);
+
+  assert.equal(
+    confirmDiscardUnsavedFormSettings(true, (message) => {
+      confirmCalls++;
+      lastMessage = message;
+      return false;
+    }),
+    false,
+  );
+  assert.equal(confirmCalls, 1);
+  assert.equal(
+    lastMessage,
+    "Pengaturan formulir yang diubah belum disimpan. Buang perubahan dan lanjutkan?",
+  );
+  assert.equal(lastMessage, UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE);
+  assert.doesNotMatch(lastMessage, EM_DASH_PATTERN);
+  assert.doesNotMatch(lastMessage, EN_DASH_PATTERN);
+
+  assert.equal(
+    confirmDiscardUnsavedFormSettings(true, () => true),
+    true,
+  );
+
+  // Tab navigation guard: only prompts when leaving form-settings with unsaved edits.
+  let tabConfirmCalls = 0;
+  assert.equal(
+    canLeaveFormSettingsTab("form-settings", "form-settings", true, false, () => {
+      tabConfirmCalls++;
+      return false;
+    }),
+    true,
+  );
+  assert.equal(
+    canLeaveFormSettingsTab("programs", "registrations", true, false, () => {
+      tabConfirmCalls++;
+      return false;
+    }),
+    true,
+  );
+  assert.equal(
+    canLeaveFormSettingsTab("form-settings", "programs", false, false, () => {
+      tabConfirmCalls++;
+      return false;
+    }),
+    true,
+  );
+  assert.equal(
+    canLeaveFormSettingsTab("form-settings", "registrations", true, true, () => {
+      tabConfirmCalls++;
+      return false;
+    }),
+    true,
+  );
+  assert.equal(tabConfirmCalls, 0);
+
+  assert.equal(
+    canLeaveFormSettingsTab("form-settings", "programs", true, false, () => {
+      tabConfirmCalls++;
+      return false;
+    }),
+    false,
+  );
+  assert.equal(
+    canLeaveFormSettingsTab("form-settings", "registrations", true, false, () => {
+      tabConfirmCalls++;
+      return true;
+    }),
+    true,
+  );
+  assert.equal(tabConfirmCalls, 2);
+
+  // Baseline/draft reload sync: clean reload syncs both; dirty reload preserves unsaved edits.
+  const initialDraft = createProgramFormSettingsDraft(sampleInternalProgram);
+  assert.equal(isProgramFormSettingsDirty(initialDraft, sampleInternalProgram), false);
+
+  const reloadedProgram: Program = {
+    ...sampleInternalProgram,
+    status: "closed",
+    registrationMaxQuota: 150,
+    registrationGroupLink: "https://line.me/ti/g/updated",
+    registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
+  };
+  const cleanSynced = syncProgramFormSettingsWithReload(
+    { baseline: sampleInternalProgram, draft: initialDraft },
+    reloadedProgram,
+  );
+  assert.equal(cleanSynced.preservedDirtyDraft, false);
+  assert.equal(cleanSynced.settingsChanged, true);
+  assert.equal(cleanSynced.baseline, reloadedProgram);
+  assert.equal(cleanSynced.draft.status, "closed");
+  assert.equal(cleanSynced.draft.registrationMaxQuota, "150");
+  assert.equal(
+    cleanSynced.draft.registrationGroupLink,
+    "https://line.me/ti/g/updated",
+  );
+  assert.equal(
+    isProgramFormSettingsDirty(cleanSynced.draft, cleanSynced.baseline),
+    false,
+  );
+
+  const metadataOnlyReload: Program = {
+    ...reloadedProgram,
+    title: "IT Versary & Sertijab 2026 (Revisi)",
+  };
+  const sameSettingsSync = syncProgramFormSettingsWithReload(
+    { baseline: reloadedProgram, draft: cleanSynced.draft },
+    metadataOnlyReload,
+  );
+  assert.equal(sameSettingsSync.preservedDirtyDraft, false);
+  assert.equal(sameSettingsSync.settingsChanged, false);
+
+  const dirtyDraft = {
+    ...initialDraft,
+    status: "upcoming" as const,
+    registrationMaxQuota: "200",
+  };
+  assert.equal(isProgramFormSettingsDirty(dirtyDraft, sampleInternalProgram), true);
+  const dirtySynced = syncProgramFormSettingsWithReload(
+    { baseline: sampleInternalProgram, draft: dirtyDraft },
+    reloadedProgram,
+  );
+  assert.equal(dirtySynced.preservedDirtyDraft, true);
+  assert.equal(dirtySynced.baseline, reloadedProgram);
+  assert.equal(dirtySynced.draft.status, "upcoming");
+  assert.equal(dirtySynced.draft.registrationMaxQuota, "200");
+  assert.equal(
+    isProgramFormSettingsDirty(dirtySynced.draft, dirtySynced.baseline),
+    true,
+  );
 });
 
 test("ParticipantsTable menyesuaikan kolom program terfilter dan menampilkan ringkasan jawaban custom di semua program", () => {
