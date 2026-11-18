@@ -644,8 +644,9 @@
 .admin-registration-link-box {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--admin-line);
+  border: 1px solid #8c8c82;
   border-radius: 0.85rem;
   background: #f6f5f1;
   color: #272723;
@@ -655,13 +656,53 @@
 }
 .admin-registration-link-path {
   padding: 0.6rem 0.8rem;
-  border: 1px solid #d8d7cd;
+  border: 1px solid #8c8c82;
   border-radius: 0.65rem;
   background: #fff;
   color: #272723;
   font-size: 0.9rem;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+.admin-form-settings-toolbar {
+  margin-bottom: 1.25rem;
+}
+.admin-form-settings {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.admin-form-settings-card {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.95rem;
+  background: #fff;
+}
+.admin-form-settings-card-header {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.admin-form-settings-card-header .admin-meta {
+  margin-top: 0;
+}
+.admin-form-settings-savebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem 1.25rem;
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.95rem;
+  background: #fafaf8;
+}
+.admin-form-settings-savebar .admin-meta {
+  margin-top: 0;
 }
 .admin-form-builder {
   display: grid;
@@ -759,6 +800,11 @@
 @media (min-width: 540px) {
   .admin-form-builder-builtin-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 960px) {
+  .admin-form-settings-card .admin-form-builder-builtin-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 .admin-form {
@@ -1028,6 +1074,22 @@
   border-color: #698c63;
   background: #edf5e9;
 }
+.admin-notice p,
+.admin-error p,
+.admin-success p {
+  color: inherit;
+}
+.admin-notice-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+.admin-empty-actions {
+  justify-content: center;
+  margin-top: 1rem;
+}
 .admin-empty {
   padding: 3rem 1rem;
   text-align: center;
@@ -1218,6 +1280,12 @@ body:has(.admin dialog[open]) {
   }
   .admin-form-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-form-settings-card {
+    padding: 1.35rem 1.4rem;
+  }
+  .admin-form-settings-savebar {
+    padding: 1.1rem 1.4rem;
   }
   .admin-content-row {
     grid-template-columns: 76px minmax(0, 1fr) auto;
