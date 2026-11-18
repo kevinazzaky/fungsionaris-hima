@@ -663,6 +663,104 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.admin-form-builder {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.95rem;
+  background: #fafaf8;
+}
+.admin-form-builder-section {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.admin-form-builder-section + .admin-form-builder-section {
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--admin-line);
+}
+.admin-form-builder-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.admin-form-builder-header > div {
+  min-width: 0;
+}
+.admin-form-builder-builtin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+}
+.admin-form-builder-builtin-item {
+  min-width: 0;
+}
+.admin-form-builder-empty {
+  padding: 0.9rem 1rem;
+  border: 1px dashed #8c8c82;
+  border-radius: 0.75rem;
+  background: #fff;
+  font-size: 0.9rem;
+  color: var(--admin-muted);
+}
+.admin-custom-field-list {
+  display: grid;
+  gap: 0.95rem;
+  min-width: 0;
+}
+.admin-custom-field-card {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #d8d7cd;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+.admin-custom-field-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--admin-line);
+}
+.admin-custom-field-card-header .admin-actions {
+  gap: 0.5rem;
+}
+.admin-custom-responses-editor {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--admin-line);
+}
+.admin-legacy-responses {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid #d8d7cd;
+  border-radius: 0.85rem;
+  background: #fafaf8;
+}
+.admin-legacy-responses .admin-details {
+  gap: 0.75rem;
+}
+.admin-custom-cell-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (min-width: 540px) {
+  .admin-form-builder-builtin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .admin-form {
   display: grid;
   gap: 1.15rem;
@@ -1251,9 +1349,12 @@ body:has(.admin dialog[open]) {
   .admin-participants-table td,
   .admin-participants-table td:first-child {
     display: table-cell;
-    min-width: 0;
+    min-width: 8.5rem;
     padding: 0.9rem 0.85rem;
     border-bottom: 1px solid var(--admin-line);
+  }
+  .admin-participants-table td:first-child {
+    min-width: 11rem;
   }
   .admin-participants-table tbody tr:last-child td {
     border-bottom: 0;

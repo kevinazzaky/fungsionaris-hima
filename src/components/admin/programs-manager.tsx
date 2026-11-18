@@ -9,9 +9,17 @@ import {
   type ProgramPeriod,
   type ProgramRegistrationMode,
 } from "@/domain/programs";
+import { ValidationError } from "@/domain/admin";
+import {
+  cloneDefaultProgramFormConfig,
+  normalizeProgramFormConfig,
+  validateProgramFormConfig,
+  type ProgramFormConfig,
+} from "@/domain/program-form-config";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
 import { PendingLabel } from "@/components/ui/pending-label";
+import { ProgramFormBuilder } from "./program-form-builder";
 import { ProgramRegistrationsManager } from "./program-registrations-manager";
 
 export type ProgramsManagerTab = "programs" | "registrations";
@@ -556,108 +564,26 @@ export function ProgramsManager({
             </div>
           ) : (
             <div className="admin-list">
-              {filtered.map((item) => {
-                const modeLabel =
-                  item.registrationMode === "internal"
-                    ? "Formulir Website"
-                    : "Tautan Eksternal";
-                const count = counts !== null ? (counts[item.id] ?? 0) : null;
-                const countText =
-                  count !== null
-                    ? item.registrationMaxQuota !== null
-                      ? `${count} / ${item.registrationMaxQuota} peserta`
-                      : `${count} peserta`
-                    : null;
-
-                return (
-                  <article className="admin-content-row" key={item.id}>
-                    <div className="admin-thumb">
-                      {item.imageUrl ? (
-                        <Image
-                          src={item.imageUrl}
-                          alt={item.title}
-                          fill
-                          sizes="76px"
-                        />
-                      ) : (
-                        <span className="admin-meta">Tanpa foto</span>
-                      )}
-                    </div>
-                    <div>
-                      <h2>{item.title}</h2>
-                      <p className="admin-meta">
-                        {item.period} · {PROGRAM_STATUSES[item.status]}
-                      </p>
-                      <div className="admin-row-badges">
-                        <span
-                          className={`admin-status ${
-                            item.registrationMode === "internal"
-                              ? "internal"
-                              : ""
-                          }`}
-                        >
-                          {modeLabel}
-                        </span>
-                        {countText !== null && (
-                          <span className="admin-meta" style={{ marginTop: 0 }}>
-                            {countText}
-                          </span>
-                        )}
-                        <span
-                          className={`admin-status ${
-                            item.isPublished ? "published" : ""
-                          }`}
-                        >
-                          {item.isPublished
-                            ? "Program dipublikasikan"
-                            : "Program disembunyikan"}
-                        </span>
-                        <span className="admin-meta" style={{ marginTop: 0 }}>
-                          Urutan {item.sortOrder}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="admin-actions">
-                      <button
-                        type="button"
-                        className="admin-button"
-                        disabled={busy}
-                        aria-label={`Lihat peserta ${item.title}`}
-                        onClick={() =>
-                          selectSectionTab("registrations", {
-                            programId: item.id,
-                            focusPanel: true,
-                          })
-                        }
-                      >
-                        Lihat peserta
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-button"
-                        disabled={busy}
-                        aria-label={`Edit ${item.title}`}
-                        onClick={() => {
-                          setSavedDialogNotice("");
-                          setEditing(item);
-                          setNotice("");
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-button danger"
-                        disabled={busy}
-                        aria-label={`Hapus ${item.title}`}
-                        onClick={() => void remove(item)}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+              {filtered.map((item) => (
+                <ProgramListRow
+                  key={item.id}
+                  item={item}
+                  count={counts !== null ? (counts[item.id] ?? 0) : null}
+                  busy={busy}
+                  onViewParticipants={() =>
+                    selectSectionTab("registrations", {
+                      programId: item.id,
+                      focusPanel: true,
+                    })
+                  }
+                  onEdit={() => {
+                    setSavedDialogNotice("");
+                    setEditing(item);
+                    setNotice("");
+                  }}
+                  onDelete={() => void remove(item)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -681,6 +607,111 @@ export function ProgramsManager({
         )}
       </div>
     </>
+  );
+}
+
+export function ProgramListRow({
+  item,
+  count,
+  busy = false,
+  onViewParticipants,
+  onEdit,
+  onDelete,
+}: {
+  item: Program;
+  count: number | null;
+  busy?: boolean;
+  onViewParticipants: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const modeLabel =
+    item.registrationMode === "internal"
+      ? "Formulir Website"
+      : "Tautan Eksternal";
+  const customFieldCount =
+    item.registrationMode === "internal"
+      ? (item.registrationFormConfig?.customFields?.length ?? 0)
+      : 0;
+  const countText =
+    count !== null
+      ? item.registrationMaxQuota !== null
+        ? `${count} / ${item.registrationMaxQuota} peserta`
+        : `${count} peserta`
+      : null;
+
+  return (
+    <article className="admin-content-row">
+      <div className="admin-thumb">
+        {item.imageUrl ? (
+          <Image src={item.imageUrl} alt={item.title} fill sizes="76px" />
+        ) : (
+          <span className="admin-meta">Tanpa foto</span>
+        )}
+      </div>
+      <div>
+        <h2>{item.title}</h2>
+        <p className="admin-meta">
+          {item.period} · {PROGRAM_STATUSES[item.status]}
+        </p>
+        <div className="admin-row-badges">
+          <span
+            className={`admin-status ${
+              item.registrationMode === "internal" ? "internal" : ""
+            }`}
+          >
+            {modeLabel}
+          </span>
+          {customFieldCount > 0 && (
+            <span className="admin-status">
+              {`${customFieldCount} kolom custom`}
+            </span>
+          )}
+          {countText !== null && (
+            <span className="admin-meta" style={{ marginTop: 0 }}>
+              {countText}
+            </span>
+          )}
+          <span className={`admin-status ${item.isPublished ? "published" : ""}`}>
+            {item.isPublished
+              ? "Program dipublikasikan"
+              : "Program disembunyikan"}
+          </span>
+          <span className="admin-meta" style={{ marginTop: 0 }}>
+            Urutan {item.sortOrder}
+          </span>
+        </div>
+      </div>
+      <div className="admin-actions">
+        <button
+          type="button"
+          className="admin-button"
+          disabled={busy}
+          aria-label={`Lihat peserta ${item.title}`}
+          onClick={onViewParticipants}
+        >
+          Lihat peserta
+        </button>
+        <button
+          type="button"
+          className="admin-button"
+          disabled={busy}
+          aria-label={`Edit ${item.title}`}
+          onClick={onEdit}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className="admin-button danger"
+          disabled={busy}
+          aria-label={`Hapus ${item.title}`}
+          onClick={onDelete}
+        >
+          Hapus
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -721,7 +752,7 @@ const fields = [
   },
 ] as const;
 
-function ProgramEditor({
+export function ProgramEditor({
   item,
   initialPeriod,
   savedNotice,
@@ -750,6 +781,10 @@ function ProgramEditor({
   const [registrationGroupLink, setRegistrationGroupLink] = useState(
     item?.registrationGroupLink || "",
   );
+  const [registrationFormConfig, setRegistrationFormConfig] =
+    useState<ProgramFormConfig>(() =>
+      normalizeProgramFormConfig(item?.registrationFormConfig),
+    );
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
   const copyTimer = useRef<number | null>(null);
@@ -815,6 +850,22 @@ function ProgramEditor({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (photoError || saving || submitting.current) return;
+    let validatedFormConfig: ProgramFormConfig;
+    try {
+      validatedFormConfig =
+        registrationMode === "internal"
+          ? validateProgramFormConfig(registrationFormConfig)
+          : item?.registrationFormConfig
+            ? normalizeProgramFormConfig(item.registrationFormConfig)
+            : cloneDefaultProgramFormConfig();
+    } catch (err) {
+      setError(
+        err instanceof ValidationError
+          ? err.message
+          : "Konfigurasi formulir pendaftaran tidak valid.",
+      );
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const data: Record<string, unknown> = {
       sortOrder: Number(form.get("sortOrder")),
@@ -827,6 +878,7 @@ function ProgramEditor({
         registrationMode === "internal" ? registrationGroupLink : "",
       registrationMaxQuota:
         registrationMode === "internal" ? registrationMaxQuota : "",
+      registrationFormConfig: validatedFormConfig,
     };
     for (const field of fields) {
       const value = String(form.get(field.key) || "");
@@ -867,6 +919,9 @@ function ProgramEditor({
             : "",
         );
         setRegistrationGroupLink(result.item.registrationGroupLink);
+        setRegistrationFormConfig(
+          normalizeProgramFormConfig(result.item.registrationFormConfig),
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Program gagal disimpan.");
@@ -1011,6 +1066,11 @@ function ProgramEditor({
                 </small>
               </label>
             </div>
+            <ProgramFormBuilder
+              value={registrationFormConfig}
+              onChange={setRegistrationFormConfig}
+              disabled={saving}
+            />
             {item ? (
               <div className="admin-registration-link-box">
                 <strong>Tautan formulir pendaftaran publik</strong>
