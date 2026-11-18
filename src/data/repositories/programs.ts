@@ -2,6 +2,7 @@ import "server-only";
 import { getPrisma } from "../prisma";
 import { mediaUrl } from "../supabase/storage";
 import { ValidationError } from "@/domain/admin";
+import { normalizeProgramFormConfig } from "@/domain/program-form-config";
 import {
   PROGRAM_ICONS,
   type Program,
@@ -29,6 +30,9 @@ const present = (row: ProgramRow): Program => ({
   registrationMode: row.registrationMode,
   registrationGroupLink: row.registrationGroupLink,
   registrationMaxQuota: row.registrationMaxQuota,
+  registrationFormConfig: normalizeProgramFormConfig(
+    row.registrationFormConfig,
+  ),
   speakers: row.speakers,
   benefits: row.benefits,
   price: row.price,
@@ -69,6 +73,8 @@ export const programRepository: ProgramRepository = {
   async save(input, id, imagePath) {
     const data = {
       ...input,
+      registrationFormConfig:
+        input.registrationFormConfig as unknown as Prisma.InputJsonValue,
       ...(imagePath !== undefined ? { imagePath } : {}),
     };
     return getPrisma().$transaction(async (db) => {

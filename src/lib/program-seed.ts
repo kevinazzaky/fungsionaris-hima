@@ -1,3 +1,4 @@
+import { cloneDefaultProgramFormConfig } from "../domain/program-form-config";
 import type { Program, ProgramInput } from "../domain/programs";
 type SeedProgram = Pick<
   ProgramInput,
@@ -189,6 +190,8 @@ export const initialPrograms: Program[] = periods.flatMap((period) =>
     registrationMode: program.registrationMode || "external",
     registrationGroupLink: program.registrationGroupLink || "",
     registrationMaxQuota: program.registrationMaxQuota ?? null,
+    registrationFormConfig:
+      program.registrationFormConfig ?? cloneDefaultProgramFormConfig(),
     speakers: program.extraDetails?.speakers || [],
     benefits: program.extraDetails?.benefits || [],
     price: program.extraDetails?.price || "",

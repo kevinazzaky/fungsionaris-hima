@@ -4,6 +4,11 @@ import {
   validatePeriod,
   ValidationError,
 } from "./admin";
+import {
+  cloneDefaultProgramFormConfig,
+  validateProgramFormConfig,
+  type ProgramFormConfig,
+} from "./program-form-config";
 
 export const PROGRAM_ICONS = {
   microphone: "Seminar",
@@ -38,6 +43,7 @@ export type ProgramInput = {
   registrationMode: ProgramRegistrationMode;
   registrationGroupLink: string;
   registrationMaxQuota: number | null;
+  registrationFormConfig: ProgramFormConfig;
   speakers: string[];
   price: string;
   benefits: string[];
@@ -127,6 +133,24 @@ function maxQuotaValue(value: unknown): number | null {
   return value;
 }
 
+function registrationFormConfigValue(value: unknown): ProgramFormConfig {
+  if (value === undefined || value === null) {
+    return cloneDefaultProgramFormConfig();
+  }
+  if (typeof value === "string") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new ValidationError(
+        "Konfigurasi formulir pendaftaran tidak valid.",
+      );
+    }
+    return validateProgramFormConfig(parsed);
+  }
+  return validateProgramFormConfig(value);
+}
+
 export function validateProgram(data: Record<string, unknown>): ProgramInput {
   const common = validateGallery({ ...data, alt: data.body });
   const status = text(data.status, "Status");
@@ -142,6 +166,9 @@ export function validateProgram(data: Record<string, unknown>): ProgramInput {
     "Tautan grup peserta",
   );
   const registrationMaxQuota = maxQuotaValue(data.registrationMaxQuota);
+  const registrationFormConfig = registrationFormConfigValue(
+    data.registrationFormConfig,
+  );
   if (status === "open" && registrationMode === "external" && !gformLink)
     throw new ValidationError(
       "Isi tautan pendaftaran sebelum membuka pendaftaran program.",
@@ -167,6 +194,7 @@ export function validateProgram(data: Record<string, unknown>): ProgramInput {
     registrationMode,
     registrationGroupLink,
     registrationMaxQuota,
+    registrationFormConfig,
     speakers: lines(data.speakers, "Narasumber"),
     benefits: lines(data.benefits, "Benefit"),
     price: text(data.price, "Biaya", 200, false),

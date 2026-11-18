@@ -34,7 +34,6 @@ export async function registerProgram(
 ): Promise<RegisterProgramResult> {
   if (typeof programId !== "string" || !programId.trim())
     throw new ValidationError("Program kerja tidak valid.");
-  const input = validateProgramRegistrationInput(data);
   const program = await programRepository.getPublished(programId);
   if (!program || !program.isPublished)
     throw new NotFoundError("Program kerja tidak ditemukan.");
@@ -46,6 +45,10 @@ export async function registerProgram(
     throw new ValidationError("Pendaftaran program kerja ini belum dibuka.");
   if (program.status !== "open")
     throw new ValidationError("Pendaftaran program kerja ini sudah ditutup.");
+  const input = validateProgramRegistrationInput(
+    data,
+    program.registrationFormConfig,
+  );
   if (program.registrationMaxQuota !== null) {
     const count = await registrationRepository.countByProgram(program.id);
     if (count >= program.registrationMaxQuota)
