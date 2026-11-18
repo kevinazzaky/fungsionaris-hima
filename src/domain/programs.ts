@@ -17,6 +17,13 @@ export const PROGRAM_STATUSES = {
   open: "Pendaftaran Dibuka",
   closed: "Pendaftaran Ditutup",
 } as const;
+export const PROGRAM_REGISTRATION_MODES = {
+  external: "Tautan eksternal",
+  internal: "Formulir internal website",
+} as const;
+
+export type ProgramRegistrationMode = keyof typeof PROGRAM_REGISTRATION_MODES;
+
 export type ProgramInput = {
   title: string;
   body: string;
@@ -28,6 +35,9 @@ export type ProgramInput = {
   status: keyof typeof PROGRAM_STATUSES;
   icon: keyof typeof PROGRAM_ICONS;
   gformLink: string;
+  registrationMode: ProgramRegistrationMode;
+  registrationGroupLink: string;
+  registrationMaxQuota: number | null;
   speakers: string[];
   price: string;
   benefits: string[];
@@ -49,6 +59,7 @@ export interface ProgramPeriodRepository {
 export interface ProgramRepository {
   list(publishedOnly?: boolean): Promise<Program[]>;
   get(id: string): Promise<Program | null>;
+  getPublished(id: string): Promise<Program | null>;
   save(
     input: ProgramInput,
     id?: string,
@@ -65,6 +76,57 @@ function lines(value: unknown, label: string): string[] {
   return value.map((entry) => text(entry, label, 300)).filter(Boolean);
 }
 
+function optionalHttpUrl(value: unknown, label: string): string {
+  const url = text(value, label, 2000, false);
+  if (!url) return "";
+  try {
+    if (!["https:", "http:"].includes(new URL(url).protocol))
+      throw new Error();
+  } catch {
+    throw new ValidationError(
+      `${label} harus berupa URL HTTP atau HTTPS yang valid.`,
+    );
+  }
+  return url;
+}
+
+function registrationModeValue(value: unknown): ProgramRegistrationMode {
+  if (value === undefined || value === null) return "external";
+  const mode = text(value, "Mode pendaftaran");
+  if (!Object.hasOwn(PROGRAM_REGISTRATION_MODES, mode))
+    throw new ValidationError("Mode pendaftaran program tidak dikenal.");
+  return mode as ProgramRegistrationMode;
+}
+
+function maxQuotaValue(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (!/^\d+$/.test(trimmed))
+      throw new ValidationError(
+        "Kuota maksimal peserta harus berupa bilangan bulat minimal 1.",
+      );
+    const parsed = Number(trimmed);
+    if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 2147483647)
+      throw new ValidationError(
+        "Kuota maksimal peserta harus antara 1 dan 2147483647.",
+      );
+    return parsed;
+  }
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 2147483647
+  ) {
+    throw new ValidationError(
+      "Kuota maksimal peserta harus antara 1 dan 2147483647.",
+    );
+  }
+  return value;
+}
+
 export function validateProgram(data: Record<string, unknown>): ProgramInput {
   const common = validateGallery({ ...data, alt: data.body });
   const status = text(data.status, "Status");
@@ -73,18 +135,14 @@ export function validateProgram(data: Record<string, unknown>): ProgramInput {
     throw new ValidationError("Status program tidak dikenal.");
   if (!Object.hasOwn(PROGRAM_ICONS, icon))
     throw new ValidationError("Ikon program tidak dikenal.");
-  const gformLink = text(data.gformLink, "Tautan pendaftaran", 2000, false);
-  if (gformLink) {
-    try {
-      if (!["https:", "http:"].includes(new URL(gformLink).protocol))
-        throw new Error();
-    } catch {
-      throw new ValidationError(
-        "Tautan pendaftaran harus berupa URL HTTP atau HTTPS yang valid.",
-      );
-    }
-  }
-  if (status === "open" && !gformLink)
+  const registrationMode = registrationModeValue(data.registrationMode);
+  const gformLink = optionalHttpUrl(data.gformLink, "Tautan pendaftaran");
+  const registrationGroupLink = optionalHttpUrl(
+    data.registrationGroupLink,
+    "Tautan grup peserta",
+  );
+  const registrationMaxQuota = maxQuotaValue(data.registrationMaxQuota);
+  if (status === "open" && registrationMode === "external" && !gformLink)
     throw new ValidationError(
       "Isi tautan pendaftaran sebelum membuka pendaftaran program.",
     );
@@ -106,6 +164,9 @@ export function validateProgram(data: Record<string, unknown>): ProgramInput {
     status: status as ProgramInput["status"],
     icon: icon as ProgramInput["icon"],
     gformLink,
+    registrationMode,
+    registrationGroupLink,
+    registrationMaxQuota,
     speakers: lines(data.speakers, "Narasumber"),
     benefits: lines(data.benefits, "Benefit"),
     price: text(data.price, "Biaya", 200, false),

@@ -23,6 +23,7 @@ export const getAdmin = cache(async () => {
 export class AccessError extends Error {
   constructor() {
     super("Silakan masuk menggunakan akun admin.");
+    this.name = "AccessError";
   }
 }
 

@@ -17,7 +17,21 @@ test("sembilan program lama tervalidasi dan dikelompokkan menurut periode tanpa 
     assert.equal(input.title, item.title);
     assert.deepEqual(input.benefits, item.benefits);
     assert.equal(input.fullDescription, item.fullDescription);
+    assert.equal(input.registrationMode, item.registrationMode);
+    assert.equal(input.registrationGroupLink, item.registrationGroupLink);
+    assert.equal(input.registrationMaxQuota, item.registrationMaxQuota);
   }
+  const itVersary = initialPrograms.find(
+    (item) =>
+      item.period === "2025/2026" &&
+      item.title === "IT Versary & Sertijab 2026",
+  );
+  assert.ok(itVersary);
+  assert.equal(itVersary.registrationMode, "internal");
+  assert.equal(itVersary.status, "open");
+  assert.equal(itVersary.registrationGroupLink, "");
+  assert.equal(itVersary.registrationMaxQuota, null);
+
   const periods = programPeriods(initialPrograms);
   assert.deepEqual(
     periods.map((period) => [period.label, period.programs.length]),
@@ -30,17 +44,42 @@ test("sembilan program lama tervalidasi dan dikelompokkan menurut periode tanpa 
   assert.equal(periods[0].programs[0].extraDetails, undefined);
   assert.deepEqual(programPeriods([]), []);
 });
-test("validasi program membatasi nilai enum, tautan, daftar, urutan dan menormalisasi periode", () => {
+test("validasi program membatasi nilai enum, tautan, mode, kuota, daftar, urutan dan menormalisasi periode", () => {
   const input = initialPrograms[0];
   assert.equal(
     validateProgram({ ...input, period: "2025-2026" }).period,
     "2025/2026",
   );
+  const {
+    registrationMode: _omittedMode,
+    registrationGroupLink: _omittedGroup,
+    registrationMaxQuota: _omittedQuota,
+    ...legacyInput
+  } = input;
+  void _omittedMode;
+  void _omittedGroup;
+  void _omittedQuota;
+  const legacyValidated = validateProgram(legacyInput);
+  assert.equal(legacyValidated.registrationMode, "external");
+  assert.equal(legacyValidated.registrationGroupLink, "");
+  assert.equal(legacyValidated.registrationMaxQuota, null);
+
   for (const data of [
     { status: "invalid" },
     { icon: "unknown" },
     { gformLink: "javascript:alert(1)" },
     { status: "open", gformLink: "" },
+    { status: "open", registrationMode: "external", gformLink: "" },
+    { registrationMode: "hybrid" },
+    { registrationMode: "" },
+    { registrationGroupLink: "javascript:alert(1)" },
+    { registrationGroupLink: "bukan-url" },
+    { registrationMaxQuota: 0 },
+    { registrationMaxQuota: -5 },
+    { registrationMaxQuota: 1.5 },
+    { registrationMaxQuota: "0" },
+    { registrationMaxQuota: "abc" },
+    { registrationMaxQuota: true },
     { speakers: [""] },
     { benefits: Array(51).fill("benefit") },
     { sortOrder: -1 },
@@ -55,6 +94,29 @@ test("validasi program membatasi nilai enum, tautan, daftar, urutan dan menormal
     }).status,
     "open",
   );
+  const internalOpen = validateProgram({
+    ...input,
+    status: "open",
+    registrationMode: "internal",
+    gformLink: "",
+    registrationGroupLink: "https://line.me/ti/g/contoh",
+    registrationMaxQuota: "120",
+  });
+  assert.equal(internalOpen.status, "open");
+  assert.equal(internalOpen.registrationMode, "internal");
+  assert.equal(internalOpen.gformLink, "");
+  assert.equal(
+    internalOpen.registrationGroupLink,
+    "https://line.me/ti/g/contoh",
+  );
+  assert.equal(internalOpen.registrationMaxQuota, 120);
+  assert.equal(
+    validateProgram({
+      ...input,
+      registrationMaxQuota: "",
+    }).registrationMaxQuota,
+    null,
+  );
 });
 function fixture() {
   const events: string[] = [];
@@ -66,6 +128,7 @@ function fixture() {
   const repository: ProgramRepository = {
     list: async () => (current ? [current] : []),
     get: async () => current,
+    getPublished: async () => (current?.isPublished ? current : null),
     save: async (input, id, imagePath) => {
       events.push("save");
       if (fail) throw new Error("database failed");

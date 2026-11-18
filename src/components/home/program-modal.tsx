@@ -2,6 +2,7 @@
 
 import { useEffect, type ComponentType } from "react";
 import Image from "next/image";
+import Link from "@/components/ui/navigation-link";
 import {
   X,
   CalendarBlank,
@@ -19,6 +20,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 export interface ProgramItem {
   id: string;
+  period?: string;
   icon: ComponentType<IconProps>;
   title: string;
   body: string;
@@ -31,6 +33,8 @@ export interface ProgramItem {
   status: "open" | "closed" | "upcoming";
   statusText: string;
   gformLink?: string;
+  registrationMode?: "external" | "internal";
+  registrationMaxQuota?: number | null;
   extraDetails?: {
     speakers?: string[];
     price?: string;
@@ -118,11 +122,8 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                   <div className="inline-flex items-center gap-2 rounded-full bg-zinc-950/80 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md">
                     {program.status === "open" ? (
                       <>
-                        <span className="relative flex h-2 w-2">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                        </span>
-                        <span className="text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        <span className="text-emerald-300">
                           {program.statusText}
                         </span>
                       </>
@@ -285,9 +286,14 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
                         ? "Pendaftaran Belum Dibuka"
                         : "Pendaftaran Telah Ditutup"}
                   </p>
-                  <p className="mt-0.5 text-xs opacity-80">
+                  <p className="mt-0.5 text-xs opacity-90">
                     {program.status === "open"
-                      ? "Segera amankan tiket dan slot pendaftaran Anda sekarang."
+                      ? program.registrationMode === "internal"
+                        ? program.registrationMaxQuota !== undefined &&
+                          program.registrationMaxQuota !== null
+                          ? `Pendaftaran peserta dibuka melalui formulir website (kuota maksimal ${program.registrationMaxQuota} peserta).`
+                          : "Pendaftaran peserta dibuka melalui formulir website HIMA TI."
+                        : "Pendaftaran dibuka melalui tautan formulir resmi panitia."
                       : program.status === "upcoming"
                         ? "Informasi pembukaan registrasi akan diumumkan menjelang pelaksanaan."
                         : "Kegiatan ini telah selesai dilaksanakan pada periode yang bersangkutan."}
@@ -408,27 +414,41 @@ export function ProgramModal({ program, onClose }: ProgramModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-zinc-500 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
               >
                 Tutup
               </button>
 
-              {program.status === "open" && program.gformLink ? (
-                <a
-                  href={program.gformLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-200 hover:bg-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-95"
-                >
-                  Daftar Sekarang
-                  <ArrowSquareOut size={16} weight="bold" />
-                </a>
+              {program.status === "open" ? (
+                program.registrationMode === "internal" ? (
+                  <Link
+                    href={`/program-kerja/${program.id}/daftar`}
+                    onClick={onClose}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 text-sm font-bold text-zinc-950 shadow-sm transition-colors duration-200 hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 active:scale-95"
+                  >
+                    Daftar Sekarang
+                  </Link>
+                ) : program.gformLink ? (
+                  <a
+                    href={program.gformLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 text-sm font-bold text-zinc-950 shadow-sm transition-colors duration-200 hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 active:scale-95"
+                  >
+                    Daftar Sekarang
+                    <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center text-xs font-semibold text-zinc-700">
+                    Tautan pendaftaran belum tersedia
+                  </span>
+                )
               ) : program.status === "upcoming" ? (
-                <span className="inline-flex items-center text-xs font-semibold text-amber-700">
+                <span className="inline-flex items-center text-xs font-semibold text-amber-900">
                   Pendaftaran segera dibuka
                 </span>
               ) : (
-                <span className="inline-flex items-center text-xs font-semibold text-zinc-500">
+                <span className="inline-flex items-center text-xs font-semibold text-zinc-700">
                   Pendaftaran telah selesai
                 </span>
               )}

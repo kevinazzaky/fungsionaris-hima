@@ -174,6 +174,111 @@ test("migration PostgreSQL mengaktifkan RLS dan keunikan NIM per periode", async
       /permission denied/,
     );
     await db.exec("RESET ROLE");
+
+    await db.exec(
+      await readFile(
+        "prisma/migrations/20261117000000_program_registrations/migration.sql",
+        "utf8",
+      ),
+    );
+    const programRegTable = await db.query<{
+      relname: string;
+      relrowsecurity: boolean;
+    }>(
+      "SELECT relname, relrowsecurity FROM pg_class WHERE relname = 'ProgramRegistration'",
+    );
+    assert.equal(programRegTable.rows.length, 1);
+    assert.equal(programRegTable.rows[0].relrowsecurity, true);
+
+    const existingPrograms = await db.query<{
+      id: string;
+      registrationMode: string;
+      registrationGroupLink: string;
+      registrationMaxQuota: number | null;
+    }>(
+      'SELECT id, "registrationMode", "registrationGroupLink", "registrationMaxQuota" FROM "Program" ORDER BY period',
+    );
+    assert.equal(existingPrograms.rows.length, 2);
+    for (const row of existingPrograms.rows) {
+      assert.equal(row.registrationMode, "external");
+      assert.equal(row.registrationGroupLink, "");
+      assert.equal(row.registrationMaxQuota, null);
+    }
+
+    const firstProgramId = existingPrograms.rows[0].id;
+    const secondProgramId = existingPrograms.rows[1].id;
+    await db.query(
+      'UPDATE "Program" SET "registrationMode" = \'internal\', "registrationMaxQuota" = 25 WHERE id = $1',
+      [firstProgramId],
+    );
+    await assert.rejects(
+      db.query(
+        'UPDATE "Program" SET "registrationMaxQuota" = 0 WHERE id = $1',
+        [firstProgramId],
+      ),
+      /check constraint/,
+    );
+
+    await db.query(
+      'INSERT INTO "ProgramRegistration" (id, "programId", nama, nim, angkatan) VALUES ($1, $2, $3, $4, $5)',
+      [randomUUID(), firstProgramId, "Peserta Uji", "22010101", "2024"],
+    );
+    await assert.rejects(
+      db.query(
+        'INSERT INTO "ProgramRegistration" (id, "programId", nama, nim, angkatan) VALUES ($1, $2, $3, $4, $5)',
+        [randomUUID(), firstProgramId, "Peserta Duplikat", "22010101", "2024"],
+      ),
+      /unique/,
+    );
+    await db.query(
+      'INSERT INTO "ProgramRegistration" (id, "programId", nama, nim, angkatan) VALUES ($1, $2, $3, $4, $5)',
+      [randomUUID(), secondProgramId, "Peserta Uji", "22010101", "2024"],
+    );
+    const savedReg = (
+      await db.query<{
+        noHp: string;
+        idLine: string;
+        email: string;
+        catatan: string;
+        submittedAt: Date | null;
+        createdAt: Date | null;
+      }>(
+        'SELECT "noHp", "idLine", email, catatan, "submittedAt", "createdAt" FROM "ProgramRegistration" WHERE "programId" = $1',
+        [firstProgramId],
+      )
+    ).rows[0];
+    assert.equal(savedReg.noHp, "");
+    assert.equal(savedReg.idLine, "");
+    assert.equal(savedReg.email, "");
+    assert.equal(savedReg.catatan, "");
+    assert.ok(savedReg.submittedAt instanceof Date);
+    assert.ok(savedReg.createdAt instanceof Date);
+
+    await assert.rejects(
+      db.query('DELETE FROM "Program" WHERE id = $1', [firstProgramId]),
+      /foreign key/,
+    );
+
+    await db.exec("SET ROLE anon");
+    await assert.rejects(
+      db.query('SELECT * FROM "ProgramRegistration"'),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query(
+        'INSERT INTO "ProgramRegistration" ("programId", nama, nim, angkatan) VALUES ($1, \'Anon\', \'12345678\', \'2024\')',
+        [firstProgramId],
+      ),
+      /permission denied/,
+    );
+    await db.exec(
+      'RESET ROLE; GRANT SELECT ON "ProgramRegistration" TO authenticated; SET ROLE authenticated;',
+    );
+    assert.equal(
+      (await db.query('SELECT * FROM "ProgramRegistration"')).rows.length,
+      0,
+    );
+    await db.exec("RESET ROLE");
   } finally {
     await db.close();
   }
