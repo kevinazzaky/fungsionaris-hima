@@ -14,6 +14,16 @@ for (const path of ["/api/admin/voting", "/api/admin/voting?export=true"]) {
   const body = await response.json();
   assert.deepEqual(Object.keys(body), ["error"]);
 }
+for (const method of ["POST", "PATCH", "DELETE"]) {
+  const pinResponse = await fetch(`${base}/api/admin/voting/pin`, {
+    method,
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: method === "POST" ? JSON.stringify({ pin: "0000" }) : undefined,
+  });
+  assert.equal(pinResponse.status, 401, `${method} /api/admin/voting/pin harus memerlukan login`);
+  const body = await pinResponse.json();
+  assert.deepEqual(Object.keys(body), ["error"]);
+}
 const page = await fetch(`${base}/admin/voting`, { redirect: "manual" });
 if (page.status === 307) {
   assert.equal(page.headers.get("location"), "/admin/login");
