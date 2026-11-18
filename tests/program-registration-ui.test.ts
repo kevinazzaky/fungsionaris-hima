@@ -9,8 +9,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Cake } from "@phosphor-icons/react/dist/ssr";
 import { ProgramPeriodTabs } from "../src/components/detail/program-period-tabs";
 import { ProgramModal } from "../src/components/home/program-modal";
-import { ProgramRegistrationForm } from "../src/components/programs/program-registration-form";
-import { DEFAULT_PROGRAM_FORM_CONFIG } from "../src/domain/program-form-config";
+import {
+  ProgramRegistrationConfirmation,
+  ProgramRegistrationForm,
+  ProgramRegistrationPrintableReceipt,
+  validateAndBuildRegistrationPayload,
+  type RegistrationResult,
+} from "../src/components/programs/program-registration-form";
+import { ValidationError } from "../src/domain/admin";
+import {
+  DEFAULT_PROGRAM_FORM_CONFIG,
+  type ProgramFormConfig,
+} from "../src/domain/program-form-config";
 import type { Program } from "../src/domain/programs";
 import { initialPrograms } from "../src/lib/program-seed";
 
@@ -38,6 +48,74 @@ const baseInternalProgram: Program = {
   isPublished: true,
   imagePath: null,
   imageUrl: null,
+};
+
+const richCustomConfig: ProgramFormConfig = {
+  builtInFields: {
+    angkatan: "hidden",
+    noHp: "optional",
+    idLine: "hidden",
+    email: "required",
+    catatan: "hidden",
+  },
+  customFields: [
+    {
+      id: "asal_prodi",
+      label: "Asal Program Studi",
+      type: "text",
+      required: true,
+      placeholder: "Contoh: Teknologi Informasi",
+      options: [],
+    },
+    {
+      id: "motivasi_ikut",
+      label: "Motivasi Mengikuti Kegiatan",
+      type: "textarea",
+      required: false,
+      placeholder: "Ceritakan singkat motivasi Anda",
+      options: [],
+    },
+    {
+      id: "semester_aktif",
+      label: "Semester Saat Ini",
+      type: "number",
+      required: true,
+      placeholder: "Masukkan angka semester",
+      options: [],
+    },
+    {
+      id: "ukuran_kaos",
+      label: "Ukuran Kaos",
+      type: "select",
+      required: true,
+      placeholder: "",
+      options: ["S", "M", "L", "XL"],
+    },
+    {
+      id: "tanggal_siap",
+      label: "Tanggal Ketersediaan Briefing",
+      type: "date",
+      required: false,
+      placeholder: "",
+      options: [],
+    },
+    {
+      id: "setuju_aturan",
+      label: "Saya bersedia mengikuti seluruh tata tertib kegiatan",
+      type: "checkbox",
+      required: true,
+      placeholder: "Kehadiran wajib dicatat saat registrasi ulang",
+      options: [],
+    },
+    {
+      id: "bersedia_dokumentasi",
+      label: "Bersedia menjadi relawan dokumentasi",
+      type: "checkbox",
+      required: false,
+      placeholder: "",
+      options: [],
+    },
+  ],
 };
 
 test("formulir pendaftaran proker merender seluruh state kondisi dengan jujur tanpa em dash", () => {
@@ -140,6 +218,348 @@ test("formulir pendaftaran aktif memiliki seluruh field wajib dan kontrol aksesi
     assert.ok(formHtml.includes(needle), `Missing ${needle} in form markup`);
   }
   assert.doesNotMatch(formHtml, /—/);
+});
+
+test("formulir pendaftaran menghormati mode hidden, optional, required pada kolom bawaan dan pasangan grid adaptif", () => {
+  const oddGridHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationFormConfig: richCustomConfig,
+      },
+      registeredCount: 3,
+      configured: true,
+    }),
+  );
+
+  assert.match(oddGridHtml, /id="reg-nama"[^>]*required/);
+  assert.match(oddGridHtml, /id="reg-nim"[^>]*required/);
+  assert.equal(oddGridHtml.includes('id="reg-angkatan"'), false);
+  assert.equal(oddGridHtml.includes('id="reg-idLine"'), false);
+  assert.equal(oddGridHtml.includes('id="reg-catatan"'), false);
+
+  assert.match(oddGridHtml, /Nomor HP \/ WhatsApp aktif.*\(opsional\)/);
+  assert.doesNotMatch(oddGridHtml, /id="reg-noHp"[^>]*required/);
+  assert.match(oddGridHtml, /Email[^<]*<span[^>]*>\*<\/span>/);
+  assert.match(oddGridHtml, /id="reg-email"[^>]*required/);
+  assert.match(
+    oddGridHtml,
+    /class="min-w-0 space-y-1\.5 sm:col-span-2">[\s\S]*?id="reg-email"/,
+  );
+
+  const evenGridConfig: ProgramFormConfig = {
+    builtInFields: {
+      angkatan: "optional",
+      noHp: "required",
+      idLine: "hidden",
+      email: "optional",
+      catatan: "optional",
+    },
+    customFields: [],
+  };
+  const evenGridHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationFormConfig: evenGridConfig,
+      },
+      registeredCount: 3,
+      configured: true,
+    }),
+  );
+  assert.match(evenGridHtml, /Angkatan.*\(opsional\)/);
+  assert.doesNotMatch(evenGridHtml, /id="reg-angkatan"[^>]*required/);
+  assert.match(
+    evenGridHtml,
+    /<option value="" selected="">Pilih tahun angkatan \(opsional\)<\/option>/,
+  );
+  assert.equal(evenGridHtml.includes('id="reg-idLine"'), false);
+  assert.equal(evenGridHtml.includes("sm:col-span-2"), false);
+
+  const singleCompactConfig: ProgramFormConfig = {
+    builtInFields: {
+      angkatan: "hidden",
+      noHp: "hidden",
+      idLine: "hidden",
+      email: "hidden",
+      catatan: "hidden",
+    },
+    customFields: [],
+  };
+  const singleCompactHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationFormConfig: singleCompactConfig,
+      },
+      registeredCount: 1,
+      configured: true,
+    }),
+  );
+  assert.match(
+    singleCompactHtml,
+    /class="min-w-0 space-y-1\.5 sm:col-span-2">[\s\S]*?id="reg-nim"/,
+  );
+  assert.doesNotMatch(singleCompactHtml, /—/);
+});
+
+test("formulir pendaftaran merender seluruh 6 tipe kolom kustom sesuai urutan konfigurasi dan standar antislop", () => {
+  const html = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationFormConfig: richCustomConfig,
+      },
+      registeredCount: 5,
+      configured: true,
+    }),
+  );
+
+  assert.match(html, /Pertanyaan Tambahan/);
+  assert.match(
+    html,
+    /id="reg-custom-asal_prodi"[^>]*type="text"[^>]*required=""[^>]*maxLength="200"[^>]*placeholder="Contoh: Teknologi Informasi"/,
+  );
+  assert.match(
+    html,
+    /<textarea id="reg-custom-motivasi_ikut"[^>]*rows="3"[^>]*maxLength="500"[^>]*placeholder="Ceritakan singkat motivasi Anda"/,
+  );
+  assert.match(html, /Motivasi Mengikuti Kegiatan.*\(opsional\)/);
+  assert.match(html, /0\/500/);
+
+  assert.match(
+    html,
+    /id="reg-custom-semester_aktif"[^>]*type="text"[^>]*inputMode="decimal"[^>]*required=""[^>]*maxLength="30"/,
+  );
+  assert.match(html, /Masukkan angka saja \(gunakan titik untuk desimal/);
+
+  assert.match(html, /<select id="reg-custom-ukuran_kaos"[^>]*required=""/);
+  assert.match(
+    html,
+    /<option value="" disabled="" selected="">Pilih Ukuran Kaos<\/option>/,
+  );
+  for (const size of ["S", "M", "L", "XL"]) {
+    assert.ok(html.includes(`<option value="${size}">${size}</option>`));
+  }
+
+  assert.match(html, /id="reg-custom-tanggal_siap"[^>]*type="date"/);
+  assert.doesNotMatch(html, /id="reg-custom-tanggal_siap"[^>]*required/);
+  assert.match(html, /Tanggal Ketersediaan Briefing.*\(opsional\)/);
+
+  assert.match(
+    html,
+    /<label for="reg-custom-setuju_aturan" class="flex min-h-\[44px\][^"]*has-\[:focus-visible\]:ring-amber-700[^"]*">[\s\S]*?<input id="reg-custom-setuju_aturan"[^>]*type="checkbox"[^>]*required=""[^>]*focus-visible:ring-amber-700/,
+  );
+  assert.match(html, /Kehadiran wajib dicatat saat registrasi ulang/);
+  assert.match(
+    html,
+    /<label for="reg-custom-bersedia_dokumentasi"[\s\S]*?<input id="reg-custom-bersedia_dokumentasi"[^>]*type="checkbox"/,
+  );
+  assert.doesNotMatch(html, /id="reg-custom-bersedia_dokumentasi"[^>]*required/);
+
+  const orderIds = [
+    'id="reg-custom-asal_prodi"',
+    'id="reg-custom-motivasi_ikut"',
+    'id="reg-custom-semester_aktif"',
+    'id="reg-custom-ukuran_kaos"',
+    'id="reg-custom-tanggal_siap"',
+    'id="reg-custom-setuju_aturan"',
+    'id="reg-custom-bersedia_dokumentasi"',
+  ];
+  let previousIdx = -1;
+  for (const idMarker of orderIds) {
+    const idx = html.indexOf(idMarker);
+    assert.ok(idx > previousIdx, `Expected ${idMarker} after index ${previousIdx}`);
+    previousIdx = idx;
+  }
+
+  assert.doesNotMatch(html, /—/);
+});
+
+test("validasi klien mengirim string kosong untuk kolom bawaan tersembunyi serta menolak jawaban kustom yang salah", () => {
+  const payload = validateAndBuildRegistrationPayload(
+    baseInternalProgram.id,
+    {
+      nama: "I Made Santika",
+      nim: "22010101",
+      angkatan: "2024",
+      noHp: "",
+      idLine: "id_lama_tersembunyi",
+      email: "santika@undiknas.ac.id",
+      catatan: "catatan tersembunyi",
+      customValues: {
+        asal_prodi: "Teknologi Informasi",
+        motivasi_ikut: "",
+        semester_aktif: "5",
+        ukuran_kaos: "L",
+        tanggal_siap: "",
+        setuju_aturan: true,
+        bersedia_dokumentasi: false,
+      },
+    },
+    richCustomConfig,
+  );
+
+  assert.equal(payload.programId, baseInternalProgram.id);
+  assert.equal(payload.angkatan, "");
+  assert.equal(payload.noHp, "");
+  assert.equal(payload.idLine, "");
+  assert.equal(payload.email, "santika@undiknas.ac.id");
+  assert.equal(payload.catatan, "");
+  assert.deepEqual(payload.customResponses, {
+    asal_prodi: "Teknologi Informasi",
+    motivasi_ikut: "",
+    semester_aktif: "5",
+    ukuran_kaos: "L",
+    tanggal_siap: "",
+    setuju_aturan: true,
+    bersedia_dokumentasi: false,
+  });
+
+  assert.throws(
+    () =>
+      validateAndBuildRegistrationPayload(
+        baseInternalProgram.id,
+        {
+          nama: "I Made Santika",
+          nim: "22010101",
+          angkatan: "",
+          noHp: "",
+          idLine: "",
+          email: "santika@undiknas.ac.id",
+          catatan: "",
+          customValues: {
+            asal_prodi: "TI",
+            semester_aktif: "5",
+            ukuran_kaos: "L",
+            setuju_aturan: false,
+          },
+        },
+        richCustomConfig,
+      ),
+    ValidationError,
+  );
+});
+
+test("ringkasan konfirmasi dan bukti cetak menampilkan field terlihat serta seluruh kolom kustom tanpa em dash", () => {
+  const result: RegistrationResult = {
+    registration: {
+      id: "33333333-3333-4333-8333-333333333333",
+      programId: baseInternalProgram.id,
+      nama: "Ni Luh Putu",
+      nim: "23010102",
+      angkatan: "",
+      submittedAt: "2026-11-18T03:30:00Z",
+    },
+    programTitle: baseInternalProgram.title,
+    registrationGroupLink: "https://chat.whatsapp.com/contoh-grup",
+    submittedNoHp: "081234567890",
+    submittedIdLine: "",
+    submittedEmail: "putu@undiknas.ac.id",
+    submittedCatatan: "",
+    submittedCustomResponses: {
+      asal_prodi: "Teknologi Informasi",
+      motivasi_ikut: "",
+      semester_aktif: "4",
+      ukuran_kaos: "M",
+      tanggal_siap: "",
+      setuju_aturan: true,
+      bersedia_dokumentasi: false,
+    },
+  };
+
+  const confirmHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationConfirmation, {
+      result,
+      formConfig: richCustomConfig,
+      onPrint: () => {},
+    }),
+  );
+  const printHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationPrintableReceipt, {
+      result,
+      programPeriod: baseInternalProgram.period,
+      formConfig: richCustomConfig,
+    }),
+  );
+
+  for (const rendered of [confirmHtml, printHtml]) {
+    assert.match(rendered, /Ni Luh Putu/);
+    assert.match(rendered, /23010102/);
+    assert.match(rendered, /Nomor HP \/ WA/);
+    assert.match(rendered, /081234567890/);
+    assert.match(rendered, /Email/);
+    assert.match(rendered, /putu@undiknas\.ac\.id/);
+
+    assert.equal(rendered.includes("Angkatan"), false);
+    assert.equal(rendered.includes("ID LINE"), false);
+    assert.equal(rendered.includes("Catatan untuk Panitia"), false);
+
+    assert.match(rendered, /Asal Program Studi[\s\S]*?Teknologi Informasi/);
+    assert.match(rendered, /Motivasi Mengikuti Kegiatan[\s\S]*?>-</);
+    assert.match(rendered, /Semester Saat Ini[\s\S]*?>4</);
+    assert.match(rendered, /Ukuran Kaos[\s\S]*?>M</);
+    assert.match(rendered, /Tanggal Ketersediaan Briefing[\s\S]*?>-</);
+    assert.match(
+      rendered,
+      /Saya bersedia mengikuti seluruh tata tertib kegiatan[\s\S]*?>Ya</,
+    );
+    assert.match(
+      rendered,
+      /Bersedia menjadi relawan dokumentasi[\s\S]*?>Tidak</,
+    );
+    assert.doesNotMatch(rendered, /—/);
+  }
+
+  assert.match(confirmHtml, /Gabung Grup Peserta/);
+  assert.match(
+    confirmHtml,
+    /href="https:\/\/chat\.whatsapp\.com\/contoh-grup"/,
+  );
+  assert.match(confirmHtml, /Cetak \/ Simpan Bukti/);
+  assert.match(confirmHtml, /Lihat Program Kerja lain/);
+  assert.match(confirmHtml, /href="\/program-kerja"/);
+
+  assert.match(printHtml, /Bukti Pendaftaran Peserta Program Kerja/);
+  assert.match(printHtml, /33333333-3333-4333-8333-333333333333/);
+  assert.match(printHtml, /Tautan Grup Resmi Peserta/);
+
+  const noGroupNoContactConfig: ProgramFormConfig = {
+    builtInFields: {
+      angkatan: "hidden",
+      noHp: "hidden",
+      idLine: "hidden",
+      email: "hidden",
+      catatan: "hidden",
+    },
+    customFields: [],
+  };
+  const fallbackConfirmHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationConfirmation, {
+      result: { ...result, registrationGroupLink: "" },
+      formConfig: noGroupNoContactConfig,
+      onPrint: () => {},
+    }),
+  );
+  assert.match(fallbackConfirmHtml, /pengumuman resmi HIMA TI/);
+  assert.doesNotMatch(fallbackConfirmHtml, /WhatsApp|ID LINE/);
+});
+
+test("komponen formulir pendaftaran memenuhi standar antislop (tanpa em dash, target 44px, alert aksesibel, min-w-0)", () => {
+  const source = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "src/components/programs/program-registration-form.tsx",
+    ),
+    "utf8",
+  );
+  assert.equal(source.includes("—"), false);
+  assert.match(source, /min-h-\[44px\]/);
+  assert.match(source, /min-h-\[48px\]/);
+  assert.match(source, /min-w-0/);
+  assert.match(source, /role="alert"/);
+  assert.match(source, /<Warning/);
+  assert.match(source, /focus-visible:ring-amber-700/);
 });
 
 test("halaman daftar program kerja menampilkan status, metadata, dan tautan daftar internal/eksternal", () => {
