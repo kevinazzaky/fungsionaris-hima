@@ -20,6 +20,7 @@ import {
   ProgramListRow,
   ProgramsManager,
 } from "../src/components/admin/programs-manager";
+import { ProgramFormSettingsManager } from "../src/components/admin/program-form-settings-manager";
 import {
   formatCustomCellValue,
   ParticipantEditor,
@@ -30,6 +31,7 @@ import {
 } from "../src/components/admin/program-registrations-manager";
 
 const EM_DASH_PATTERN = /\u2014/;
+const EN_DASH_PATTERN = /\u2013/;
 
 const sampleFormConfig: ProgramFormConfig = {
   builtInFields: {
@@ -151,19 +153,36 @@ const sampleParticipant: ProgramRegistrationAdminRow = {
   createdAt: "2026-11-18T02:00:00.000Z",
 };
 
-test("ProgramsManager merender tab daftar program dan peserta proker tanpa em dash", () => {
+test("ProgramsManager merender tab daftar program, atur formulir, dan peserta proker tanpa em/en dash", () => {
   const html = renderToStaticMarkup(createElement(ProgramsManager));
   assert.match(html, /role="tablist"/);
   assert.match(html, /Daftar program/);
+  assert.match(html, /Atur formulir/);
   assert.match(html, /Peserta proker/);
   assert.match(html, /id="programs-tab-programs"[^>]*aria-selected="true"/);
   assert.match(html, /Tambah periode/);
   assert.match(html, /Tambah program/);
   assert.match(html, /Memuat program kerja/);
   assert.doesNotMatch(html, EM_DASH_PATTERN);
+  assert.doesNotMatch(html, EN_DASH_PATTERN);
 });
 
-test("ProgramsManager mendukung tab awal peserta dengan filter programId", () => {
+test("ProgramsManager mendukung tab awal formulir dan peserta dengan programId", () => {
+  const formHtml = renderToStaticMarkup(
+    createElement(ProgramsManager, {
+      initialTab: "form-settings",
+      initialProgramId: "11111111-1111-4111-8111-111111111111",
+    }),
+  );
+  assert.match(
+    formHtml,
+    /id="programs-tab-form-settings"[^>]*aria-selected="true"/,
+  );
+  assert.match(formHtml, /Pengaturan formulir program/);
+  assert.match(formHtml, /Memuat pengaturan formulir/);
+  assert.doesNotMatch(formHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(formHtml, EN_DASH_PATTERN);
+
   const html = renderToStaticMarkup(
     createElement(ProgramsManager, {
       initialTab: "registrations",
@@ -180,6 +199,7 @@ test("ProgramsManager mendukung tab awal peserta dengan filter programId", () =>
     /href="\/api\/admin\/program-registrations\/export\?programId=11111111-1111-4111-8111-111111111111"/,
   );
   assert.doesNotMatch(html, EM_DASH_PATTERN);
+  assert.doesNotMatch(html, EN_DASH_PATTERN);
 });
 
 test("ProgramRegistrationsManager merender filter program, pencarian, dan tautan ekspor Excel", () => {
@@ -297,40 +317,52 @@ test("ProgramFormBuilder dan helper merender kolom bawaan, semua tipe custom, ba
   assert.match(maxedHtml, /disabled=""[^>]*>\+ Tambah pertanyaan/);
 });
 
-test("ProgramEditor menampilkan ProgramFormBuilder hanya saat mode pendaftaran internal", () => {
+test("ProgramEditor tetap ringkas tanpa form builder dan ProgramListRow menampilkan Atur formulir hanya untuk mode internal", () => {
   const internalHtml = renderToStaticMarkup(
     createElement(ProgramEditor, {
       item: sampleInternalProgram,
       initialPeriod: "2025/2026",
-      savedNotice: "",
       onCancel: () => {},
       onSaved: async () => {},
       onBusy: () => {},
     }),
   );
-  assert.match(internalHtml, /Kolom bawaan formulir/);
-  assert.match(internalHtml, /Pertanyaan tambahan custom/);
-  assert.match(internalHtml, /Asal Instansi/);
+  assert.match(
+    internalHtml,
+    /Kuota peserta, tautan grup WA\/LINE, tautan halaman publik, dan kolom formulir custom diatur terpisah pada tab Atur formulir\./,
+  );
+  assert.doesNotMatch(internalHtml, /Kolom bawaan formulir/);
+  assert.doesNotMatch(internalHtml, /Pertanyaan tambahan custom/);
+  assert.doesNotMatch(internalHtml, /Kuota maksimal peserta/);
+  assert.doesNotMatch(internalHtml, /Tautan grup WA\/LINE peserta/);
+  assert.doesNotMatch(internalHtml, /Tautan formulir pendaftaran publik/);
+  assert.doesNotMatch(internalHtml, /Asal Instansi/);
   assert.doesNotMatch(internalHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(internalHtml, EN_DASH_PATTERN);
 
   const externalHtml = renderToStaticMarkup(
     createElement(ProgramEditor, {
       item: sampleExternalProgram,
       initialPeriod: "2025/2026",
-      savedNotice: "",
       onCancel: () => {},
       onSaved: async () => {},
       onBusy: () => {},
     }),
   );
+  assert.match(externalHtml, /Tautan pendaftaran \(URL\)/);
+  assert.doesNotMatch(externalHtml, /diatur terpisah pada tab Atur formulir/);
   assert.doesNotMatch(externalHtml, /Kolom bawaan formulir/);
   assert.doesNotMatch(externalHtml, /Pertanyaan tambahan custom/);
+  assert.doesNotMatch(externalHtml, /Kuota maksimal peserta/);
+  assert.doesNotMatch(externalHtml, /Tautan grup WA\/LINE peserta/);
   assert.doesNotMatch(externalHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(externalHtml, EN_DASH_PATTERN);
 
   const internalRowHtml = renderToStaticMarkup(
     createElement(ProgramListRow, {
       item: sampleInternalProgram,
       count: 12,
+      onConfigureForm: () => {},
       onViewParticipants: () => {},
       onEdit: () => {},
       onDelete: () => {},
@@ -339,6 +371,12 @@ test("ProgramEditor menampilkan ProgramFormBuilder hanya saat mode pendaftaran i
   assert.match(internalRowHtml, /Formulir Website/);
   assert.match(internalRowHtml, /6 kolom custom/);
   assert.match(internalRowHtml, /12 \/ 100 peserta/);
+  assert.match(
+    internalRowHtml,
+    /aria-label="Atur formulir IT Versary &amp; Sertijab 2026"[^>]*>Atur formulir<\/button>/,
+  );
+  assert.doesNotMatch(internalRowHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(internalRowHtml, EN_DASH_PATTERN);
 
   const externalRowHtml = renderToStaticMarkup(
     createElement(ProgramListRow, {
@@ -347,6 +385,7 @@ test("ProgramEditor menampilkan ProgramFormBuilder hanya saat mode pendaftaran i
         registrationFormConfig: sampleFormConfig,
       },
       count: 0,
+      onConfigureForm: () => {},
       onViewParticipants: () => {},
       onEdit: () => {},
       onDelete: () => {},
@@ -354,6 +393,93 @@ test("ProgramEditor menampilkan ProgramFormBuilder hanya saat mode pendaftaran i
   );
   assert.match(externalRowHtml, /Tautan Eksternal/);
   assert.doesNotMatch(externalRowHtml, /kolom custom/);
+  assert.doesNotMatch(externalRowHtml, /Atur formulir/);
+  assert.doesNotMatch(externalRowHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(externalRowHtml, EN_DASH_PATTERN);
+});
+
+test("ProgramFormSettingsManager merender pemilih program internal, kartu pengaturan, ProgramFormBuilder, dan empty/loading/error state tanpa em/en dash", () => {
+  const secondInternalProgram: Program = {
+    ...sampleInternalProgram,
+    id: "55555555-5555-4555-8555-555555555555",
+    title: "Pelatihan Web Lanjutan",
+    period: "2026/2027",
+    status: "upcoming",
+    registrationMaxQuota: null,
+    registrationGroupLink: "",
+    registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
+  };
+
+  const fullHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [sampleInternalProgram, sampleExternalProgram, secondInternalProgram],
+      selectedProgramId: sampleInternalProgram.id,
+      onProgramIdChange: () => {},
+      onOpenProgramsTab: () => {},
+      onOpenParticipants: () => {},
+    }),
+  );
+  for (const needle of [
+    "Pengaturan formulir program",
+    "Lihat peserta program ini",
+    "Pilih program kerja internal",
+    "2025/2026 - IT Versary &amp; Sertijab 2026",
+    "2026/2027 - Pelatihan Web Lanjutan",
+    "2 program bermode Formulir Website",
+    "Akses, kuota &amp; tautan grup",
+    "Status pendaftaran",
+    "Kuota maksimal peserta (opsional)",
+    "Tautan grup WA/LINE peserta (opsional)",
+    "Tautan formulir pendaftaran publik",
+    `/program-kerja/${sampleInternalProgram.id}/daftar`,
+    "Buka halaman",
+    "Salin tautan",
+    "Susunan kolom formulir",
+    "Kolom bawaan formulir",
+    "Pertanyaan tambahan custom",
+    "Asal Instansi",
+    "Reset perubahan",
+    "Simpan pengaturan formulir",
+  ]) {
+    assert.ok(
+      fullHtml.includes(needle),
+      `Missing expected form settings content: ${needle}`,
+    );
+  }
+  assert.doesNotMatch(fullHtml, /Seminar Eksternal/);
+  assert.doesNotMatch(fullHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(fullHtml, EN_DASH_PATTERN);
+
+  const emptyHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [sampleExternalProgram],
+      onOpenProgramsTab: () => {},
+    }),
+  );
+  assert.match(emptyHtml, /Belum ada program bermode Formulir Website/);
+  assert.match(emptyHtml, /Buka Daftar program/);
+  assert.doesNotMatch(emptyHtml, /Simpan pengaturan formulir/);
+  assert.doesNotMatch(emptyHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(emptyHtml, EN_DASH_PATTERN);
+
+  const loadingHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [],
+      loading: true,
+    }),
+  );
+  assert.match(loadingHtml, /Memuat pengaturan formulir/);
+  assert.doesNotMatch(loadingHtml, /Belum ada program bermode Formulir Website/);
+
+  const errorHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [],
+      error: "Koneksi gagal.",
+      onReload: () => {},
+    }),
+  );
+  assert.match(errorHtml, /Koneksi gagal\./);
+  assert.match(errorHtml, /Muat ulang/);
 });
 
 test("ParticipantsTable menyesuaikan kolom program terfilter dan menampilkan ringkasan jawaban custom di semua program", () => {
@@ -557,9 +683,11 @@ test("ParticipantEditor merender option fallback untuk nilai select terdahulu ya
   assert.doesNotMatch(emptyHtml, EM_DASH_PATTERN);
 });
 
-test("seluruh file Admin UI yang diubah bebas em dash dan memenuhi penjagaan aksesibilitas CSS", () => {
+test("seluruh file Admin UI yang diubah bebas em/en dash dan memenuhi penjagaan aksesibilitas CSS", () => {
   const files = [
+    "src/app/admin/(panel)/program-kerja/page.tsx",
     "src/components/admin/program-form-builder.tsx",
+    "src/components/admin/program-form-settings-manager.tsx",
     "src/components/admin/programs-manager.tsx",
     "src/components/admin/program-registrations-manager.tsx",
     "src/app/admin/admin.css",
@@ -572,6 +700,11 @@ test("seluruh file Admin UI yang diubah bebas em dash dan memenuhi penjagaan aks
       false,
       `Em dash found in ${rel}`,
     );
+    assert.equal(
+      content.includes("\u2013"),
+      false,
+      `En dash found in ${rel}`,
+    );
   }
 
   const css = fs.readFileSync(
@@ -579,6 +712,18 @@ test("seluruh file Admin UI yang diubah bebas em dash dan memenuhi penjagaan aks
     "utf8",
   );
   assert.match(css, /\.admin-form-builder/);
+  assert.match(
+    css,
+    /\.admin-form-settings-card\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-form-settings-savebar\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-registration-link-box\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
   assert.match(
     css,
     /\.admin-custom-field-card\s*\{[^}]*border:\s*1px solid #8c8c82/,
