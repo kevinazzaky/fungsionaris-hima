@@ -38,7 +38,15 @@ Atas permintaan pengguna, batas jaringan menjadi 50 pemeriksaan NIM dan 50 pengi
 
 ## Konfigurasi dan menjalankan
 
-Gunakan environment database/Auth/Storage existing dari `.env.example`. Tambahkan `VOTING_SECRET` acak minimal 32 karakter (server-only; buat dengan `openssl rand -hex 32`) dan `VOTING_PROTOTYPE_ENABLED=true` hanya di lingkungan uji. Tidak ada key pihak ketiga yang diperlukan untuk alur voting. Jangan mengganti `VOTING_SECRET` selama periode berjalan: HMAC DPT dan token lama akan tidak cocok. Mode prototipe lokal telah diaktifkan sesuai arahan untuk pengujian, tetapi perubahan ini tidak menjadwalkan atau membuka periode pemilihan di database.
+Gunakan environment database/Auth/Storage existing dari `.env.example`. Tambahkan `VOTING_SECRET` acak minimal 32 karakter (server-only; buat dengan `openssl rand -hex 32`) dan `VOTING_PROTOTYPE_ENABLED=true` hanya di lingkungan uji. Tidak ada key pihak ketiga atau variabel environment PIN tambahan yang perlu dipasang di Vercel. Jangan mengganti `VOTING_SECRET` selama periode berjalan: HMAC DPT dan token lama akan tidak cocok.
+
+### Kunci PIN tab Pemilihan Ketua (Database)
+
+Halaman `/admin/voting` serta seluruh GET, mutasi POST, dan ekspor Excel `/api/admin/voting` dilindungi verifikasi PIN yang disimpan terenkripsi (`scrypt` salted hash pada `voting_settings.admin_pin_hash`, disertai `pin_version` dan `pin_updated_at`). Akses langsung `anon`/`authenticated` ke `voting_settings` tetap dicabut oleh RLS.
+
+- **Setup awal & fail-closed**: sebelum `admin_pin_hash` terisi (atau bila migrasi `20261118010000_voting_admin_pin` belum dijalankan), `/admin/voting` hanya menampilkan layar **Buat PIN Pemilihan Ketua** (atau status belum siap) tanpa memuat data pemilihan, kandidat, DPT, suara, maupun log audit, dan seluruh endpoint `/api/admin/voting` menolak dengan status 403 (`VOTING_PIN_LOCKED`). Penetapan awal dilakukan atomik dengan row lock (`WHERE admin_pin_hash IS NULL`), atau melalui CLI operator `npm run db:voting-pin -- --pin "<pin>"`.
+- **Buka kunci & brute-force limit**: `POST /api/admin/voting/pin` membatasi maksimal 5 percobaan per 10 menit melalui limiter PostgreSQL, memverifikasi hash `scrypt` secara konstan-waktu (`timingSafeEqual`), dan menerbitkan cookie sesi `HttpOnly` bertanda tangan (`hima_voting_admin_lock`) terikat ke ID `AdminUser` serta `pin_version`, berlaku maksimal 30 menit atau hingga browser ditutup.
+- **Ganti PIN & kunci kembali**: `PATCH /api/admin/voting/pin` (di balik **Ganti PIN** sesudah terbuka) wajib memverifikasi `PIN saat ini` (dengan batas percobaan yang sama) dan menaikkan `pin_version` sehingga sesi di browser lain otomatis terkunci tanpa deploy ulang. `DELETE /api/admin/voting/pin` (**Kunci Pemilihan Ketua**), **Keluar akun**, serta ganti kata sandi admin langsung menghapus cookie akses. Mode prototipe lokal tetap tidak menjadwalkan atau membuka periode pemilihan di database.
 
 Untuk Supabase yang memakai CA khusus, gunakan `sslmode=verify-full` dan `sslrootcert` pada URL koneksi. CA publik resmi tersedia pada `supabase/certs/prod-ca-2021.crt`; catatan sumber dan fingerprint ada di folder tersebut. Konfigurasi lokal HIMA telah dipasang dan migration voting diterapkan atas permintaan pengguna pada 10 November 2026; voting tetap nonaktif. Detail pemeriksaan tersedia di `QA_VOTING.md`.
 
@@ -95,16 +103,17 @@ Berkas yang ditambahkan:
 - `src/app/voting/page.tsx`, `loading.tsx`, `error.tsx`, `voting.css`: halaman dan state publik.
 - `src/components/voting/voting-page.tsx`, `voting-dialog.tsx`: alur mahasiswa, profil/konfirmasi dan ucapan terima kasih sebelum kembali ke beranda.
 - `src/components/home/voting-section.tsx`: akses dari beranda setelah Tentang Kami.
-- `src/app/admin/(panel)/voting/page.tsx`, `src/components/admin/voting-manager.tsx`: panel panitia.
+- `src/app/admin/(panel)/voting/page.tsx`, `src/components/admin/voting-manager.tsx`, `src/components/admin/voting-pin-gate.tsx`, `src/components/admin/voting-pin-field.tsx`: panel panitia dan layar kunci PIN.
 - `src/app/api/voting/check/route.ts`, `src/app/api/voting/ballots/route.ts`: pemeriksaan dan submit publik.
-- `src/app/api/admin/voting/route.ts`: pengelolaan, preview/impor, penjadwalan, penutupan, dan rekap.
-- `src/domain/voting.ts`: DTO dan validasi NIM, CSV, kandidat, jadwal.
-- `src/use-cases/voting.ts`, `src/use-cases/voting-token.ts`: sesi HMAC dan kebijakan hasil.
+- `src/app/api/admin/voting/route.ts`, `src/app/api/admin/voting/pin/route.ts`: pengelolaan, kunci/setup/ganti PIN, preview/impor, penjadwalan, penutupan, dan rekap.
+- `src/domain/voting.ts`, `src/domain/voting-pin.ts`: DTO, tipe error kunci PIN, dan validasi NIM, CSV, kandidat, jadwal.
+- `src/use-cases/voting.ts`, `src/use-cases/voting-token.ts`, `src/use-cases/voting-pin.ts`: sesi HMAC, hash `scrypt` & verifikasi PIN, dan kebijakan hasil.
 - `src/use-cases/manage-voting-period.ts`, `tests/voting-period.test.ts`: pemilihan periode existing/baru, penanganan pilihan bersamaan, dan kegagalan penyimpanan.
-- `src/data/repositories/voting.ts`, `src/data/voting.ts`: penyimpanan dan pembacaan server-only.
-- `src/lib/voting-api.ts`: pembatasan request dan transport publik.
-- `prisma/migrations/20261110000000_voting/migration.sql`: tabel, fungsi transaksi, trigger penguncian dan RLS.
-- `tests/voting.test.ts`, `tests/voting-security.test.ts`, `tests/voting-database.test.ts`: tes domain, keamanan, SQL.
+- `src/data/repositories/voting.ts`, `src/data/repositories/voting-pin.ts`, `src/data/voting.ts`: penyimpanan dan pembacaan server-only.
+- `src/lib/voting-api.ts`, `src/lib/voting-admin-lock.ts`: pembatasan request, proteksi cookie PIN admin, dan transport publik.
+- `prisma/migrations/20261110000000_voting/migration.sql`, `prisma/migrations/20261118010000_voting_admin_pin/migration.sql`: tabel, kolom hash PIN, fungsi transaksi, trigger penguncian, dan RLS.
+- `scripts/set-voting-pin.ts`: utilitas CLI operator untuk menyetel atau mereset PIN langsung ke database.
+- `tests/voting.test.ts`, `tests/voting-security.test.ts`, `tests/voting-database.test.ts`, `tests/voting-pin.test.ts`: tes domain, keamanan, kunci PIN, dan SQL.
 - `scripts/check-voting-access.mjs`: smoke test HTTP lokal.
 - `docs/examples/dpt-dummy.csv`: fixture DPT dummy.
 - `docs/EVOTING.md`, `docs/QA_VOTING.md`: panduan dan hasil verifikasi.

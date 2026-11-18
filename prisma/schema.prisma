@@ -189,9 +189,12 @@ model Election {
 }
 
 model VotingSettings {
-  id String @id @default("main")
-  electionId String? @unique @map("election_id") @db.Uuid
-  election Election? @relation(fields: [electionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id           String    @id @default("main")
+  electionId   String?   @unique @map("election_id") @db.Uuid
+  adminPinHash String?   @map("admin_pin_hash")
+  pinVersion   Int       @default(0) @map("pin_version")
+  pinUpdatedAt DateTime? @map("pin_updated_at") @db.Timestamptz(3)
+  election     Election? @relation(fields: [electionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@map("voting_settings")
 }
 

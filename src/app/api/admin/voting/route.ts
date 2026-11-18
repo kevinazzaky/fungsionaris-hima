@@ -21,12 +21,14 @@ import { uploadImage, removeFile } from "@/data/supabase/storage";
 import { MEDIA_BUCKET } from "@/lib/backend-config";
 import { votingReady } from "@/data/voting";
 import { createVotingRecap } from "@/lib/voting-export";
+import { requireVotingPin } from "@/lib/voting-admin-lock";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requireAdmin();
+    await requireVotingPin(admin.id);
     const params = new URL(request.url).searchParams;
     const id = params.get("id") || undefined;
     if (id) assertUuid(id);
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const admin = await requireAdmin();
+    await requireVotingPin(admin.id);
     const form = await readForm(request);
     const action = form.get("action");
     if (action === "create")

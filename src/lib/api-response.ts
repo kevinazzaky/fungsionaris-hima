@@ -1,12 +1,27 @@
 import "server-only";
 import { AccessError } from "@/data/auth";
 import { ValidationError } from "@/domain/admin";
+import { VotingPinLockedError } from "@/domain/voting-pin";
 import { Prisma } from "@/generated/prisma/client";
 import { hasSameOrigin } from "@/domain/request-origin";
 
 export function apiError(error: unknown) {
   if (error instanceof AccessError)
     return Response.json({ error: error.message }, { status: 401 });
+  if (error instanceof VotingPinLockedError)
+    return Response.json(
+      {
+        error: error.message,
+        code: error.code,
+        locked: true,
+        pinConfigured: error.pinConfigured,
+        state: error.state,
+      },
+      {
+        status: 403,
+        headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
+      },
+    );
   if (error instanceof ValidationError || error instanceof SyntaxError)
     return Response.json({ error: error.message }, { status: 400 });
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
