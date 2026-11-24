@@ -50,6 +50,20 @@ export type CohortQuotaConfig = {
   tiers: CohortQuotaTier[];
 };
 
+export type CohortQuotaSummaryItem = {
+  angkatan: string;
+  maxQuota: number;
+  registered: number;
+  remaining: number;
+  isFull: boolean;
+};
+
+export type CohortQuotaSummary = {
+  enabled: boolean;
+  items: CohortQuotaSummaryItem[];
+  allFull: boolean;
+};
+
 export type ProgramFormConfig = {
   builtInFields: Record<BuiltInFieldKey, BuiltInFieldMode>;
   customFields: CustomFormField[];
@@ -97,6 +111,39 @@ export function resolveCohortQuotaConfig(
   return {
     enabled: Boolean(config?.cohortQuotas?.enabled && tiers.length > 0),
     tiers,
+  };
+}
+
+export function buildCohortQuotaSummary(
+  formConfig: ProgramFormConfig,
+  cohortCounts: Record<string, number> = {},
+): CohortQuotaSummary {
+  const resolved = resolveCohortQuotaConfig(formConfig);
+  const items = resolved.tiers.map((tier) => {
+    const rawCount = Object.hasOwn(cohortCounts, tier.angkatan)
+      ? cohortCounts[tier.angkatan]
+      : 0;
+    const registered =
+      typeof rawCount === "number" && Number.isFinite(rawCount)
+        ? Math.max(0, Math.floor(rawCount))
+        : 0;
+    const remaining = Math.max(0, tier.maxQuota - registered);
+    const isFull = registered >= tier.maxQuota;
+    return {
+      angkatan: tier.angkatan,
+      maxQuota: tier.maxQuota,
+      registered,
+      remaining,
+      isFull,
+    };
+  });
+  const enabled = resolved.enabled;
+  const allFull =
+    enabled && items.length > 0 && items.every((item) => item.isFull);
+  return {
+    enabled,
+    items,
+    allFull,
   };
 }
 
