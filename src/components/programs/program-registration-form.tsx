@@ -17,6 +17,7 @@ import { ValidationError } from "@/domain/admin";
 import {
   formatCustomResponseValue,
   normalizeProgramFormConfig,
+  resolveCohortQuotaConfig,
   type CustomFormField,
   type ProgramCustomResponses,
   type ProgramFormConfig,
@@ -46,7 +47,22 @@ const TEXTAREA_CLASS =
 export type ProgramRegistrationFormProps = {
   program: Program;
   registeredCount: number;
+  cohortCounts?: Record<string, number>;
   configured: boolean;
+};
+
+export type CohortQuotaSummaryItem = {
+  angkatan: string;
+  maxQuota: number;
+  registered: number;
+  remaining: number;
+  isFull: boolean;
+};
+
+export type CohortQuotaSummary = {
+  enabled: boolean;
+  items: CohortQuotaSummaryItem[];
+  allFull: boolean;
 };
 
 export type RegistrationResult = {
@@ -107,12 +123,47 @@ function formatSubmittedAt(value: string): string {
   );
 }
 
+export function buildCohortQuotaSummary(
+  formConfig: ProgramFormConfig,
+  cohortCounts: Record<string, number> = {},
+): CohortQuotaSummary {
+  const resolved = resolveCohortQuotaConfig(formConfig);
+  const items = resolved.tiers.map((tier) => {
+    const rawCount = Object.hasOwn(cohortCounts, tier.angkatan)
+      ? cohortCounts[tier.angkatan]
+      : 0;
+    const registered =
+      typeof rawCount === "number" && Number.isFinite(rawCount)
+        ? Math.max(0, Math.floor(rawCount))
+        : 0;
+    const remaining = Math.max(0, tier.maxQuota - registered);
+    const isFull = registered >= tier.maxQuota;
+    return {
+      angkatan: tier.angkatan,
+      maxQuota: tier.maxQuota,
+      registered,
+      remaining,
+      isFull,
+    };
+  });
+  const enabled = resolved.enabled;
+  const allFull =
+    enabled && items.length > 0 && items.every((item) => item.isFull);
+  return {
+    enabled,
+    items,
+    allFull,
+  };
+}
+
 export function validateAndBuildRegistrationPayload(
   programId: string,
   state: RawRegistrationFormState,
   formConfig: ProgramFormConfig,
+  cohortCounts?: Record<string, number>,
 ): ProgramRegistrationInput & { programId: string } {
   const { builtInFields, customFields } = formConfig;
+  const cohortSummary = buildCohortQuotaSummary(formConfig, cohortCounts);
   const customResponses: ProgramCustomResponses = {};
   for (const field of customFields) {
     const raw = Object.hasOwn(state.customValues, field.id)
@@ -130,7 +181,10 @@ export function validateAndBuildRegistrationPayload(
     {
       nama: state.nama,
       nim: state.nim,
-      angkatan: builtInFields.angkatan === "hidden" ? "" : state.angkatan,
+      angkatan:
+        builtInFields.angkatan === "hidden" && !cohortSummary.enabled
+          ? ""
+          : state.angkatan,
       noHp: builtInFields.noHp === "hidden" ? "" : state.noHp,
       idLine: builtInFields.idLine === "hidden" ? "" : state.idLine,
       email: builtInFields.email === "hidden" ? "" : state.email,
@@ -139,6 +193,17 @@ export function validateAndBuildRegistrationPayload(
     },
     formConfig,
   );
+
+  if (cohortSummary.enabled) {
+    const selectedCohort = cohortSummary.items.find(
+      (item) => item.angkatan === validated.angkatan,
+    );
+    if (selectedCohort?.isFull) {
+      throw new ValidationError(
+        `Kuota pendaftaran untuk angkatan ${selectedCohort.angkatan} sudah penuh (${selectedCohort.registered}/${selectedCohort.maxQuota} peserta).`,
+      );
+    }
+  }
 
   return {
     programId,
@@ -663,9 +728,11 @@ function StatusNoticeCard({
 export function ProgramRegistrationForm({
   program,
   registeredCount,
+  cohortCounts = {},
   configured,
 }: ProgramRegistrationFormProps) {
   const formConfig = normalizeProgramFormConfig(program.registrationFormConfig);
+  const cohortSummary = buildCohortQuotaSummary(formConfig, cohortCounts);
   const { builtInFields, customFields } = formConfig;
 
   const [nama, setNama] = useState("");
@@ -791,20 +858,64 @@ export function ProgramRegistrationForm({
     );
   }
 
-  if (
+  const isOverallQuotaFull =
     program.registrationMaxQuota !== null &&
-    registeredCount >= program.registrationMaxQuota
-  ) {
+    registeredCount >= program.registrationMaxQuota;
+
+  if (isOverallQuotaFull || cohortSummary.allFull) {
+    const cohortYears = cohortSummary.items
+      .map((item) => item.angkatan)
+      .join(", ");
+    const description = cohortSummary.allFull
+      ? `Seluruh kuota angkatan yang dibuka (${cohortYears}) untuk ${program.title} sudah terisi penuh.`
+      : `Seluruh ${program.registrationMaxQuota} slot peserta untuk ${program.title} telah terisi (${registeredCount} dari ${program.registrationMaxQuota} peserta terdaftar).`;
+
     return (
       <StatusNoticeCard
         icon={<Users size={22} weight="bold" aria-hidden="true" />}
         title="Kuota Peserta Penuh"
-        description={`Seluruh ${program.registrationMaxQuota} slot peserta untuk ${program.title} telah terisi (${registeredCount} dari ${program.registrationMaxQuota} peserta terdaftar).`}
+        description={description}
         extra={
-          program.contactPerson ? (
-            <p className="pt-1 text-sm font-medium text-zinc-800 break-words">
-              Narahubung: {program.contactPerson}
-            </p>
+          cohortSummary.enabled || program.contactPerson ? (
+            <div className="space-y-3 pt-1">
+              {cohortSummary.enabled ? (
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {cohortSummary.items.map((item) => (
+                    <li
+                      key={item.angkatan}
+                      className={
+                        item.isFull
+                          ? "min-w-0 rounded-xl border border-red-600 bg-red-50 px-3 py-2 text-xs"
+                          : "min-w-0 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-2 text-xs"
+                      }
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <span className="font-bold text-zinc-900">
+                          {item.angkatan}
+                        </span>
+                        <span
+                          className={
+                            item.isFull
+                              ? "font-bold text-red-800"
+                              : "font-bold text-emerald-900"
+                          }
+                        >
+                          {item.isFull ? "Penuh" : `Sisa ${item.remaining}`}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-zinc-700 break-words">
+                        {item.registered}/{item.maxQuota} peserta
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {program.contactPerson ? (
+                <p className="text-sm font-medium text-zinc-800 break-words">
+                  Narahubung: {program.contactPerson}
+                </p>
+              ) : null}
+            </div>
           ) : null
         }
       />
@@ -845,6 +956,7 @@ export function ProgramRegistrationForm({
           customValues,
         },
         formConfig,
+        cohortCounts,
       );
     } catch (error) {
       setErrorMsg(
@@ -977,8 +1089,9 @@ export function ProgramRegistrationForm({
     },
   ];
 
-  if (builtInFields.angkatan !== "hidden") {
-    const required = builtInFields.angkatan === "required";
+  if (builtInFields.angkatan !== "hidden" || cohortSummary.enabled) {
+    const required =
+      builtInFields.angkatan === "required" || cohortSummary.enabled;
     compactFields.push({
       key: "angkatan",
       node: (
@@ -995,6 +1108,9 @@ export function ProgramRegistrationForm({
             required={required}
             value={angkatan}
             onChange={(e) => setAngkatan(e.target.value)}
+            aria-describedby={
+              cohortSummary.enabled ? "reg-angkatan-hint" : undefined
+            }
             className={INPUT_CLASS}
           >
             <option value="" disabled={required}>
@@ -1002,12 +1118,32 @@ export function ProgramRegistrationForm({
                 ? "Pilih tahun angkatan"
                 : "Pilih tahun angkatan (opsional)"}
             </option>
-            {ANGKATAN_OPTIONS.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
+            {cohortSummary.enabled
+              ? cohortSummary.items.map((item) => (
+                  <option
+                    key={item.angkatan}
+                    value={item.angkatan}
+                    disabled={item.isFull}
+                  >
+                    {item.isFull
+                      ? `${item.angkatan} (Penuh - ${item.registered}/${item.maxQuota})`
+                      : `${item.angkatan} (Sisa ${item.remaining} dari ${item.maxQuota})`}
+                  </option>
+                ))
+              : ANGKATAN_OPTIONS.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
           </select>
+          {cohortSummary.enabled ? (
+            <p
+              id="reg-angkatan-hint"
+              className="text-xs leading-relaxed text-zinc-600"
+            >
+              Pilih angkatan yang masih memiliki sisa kuota peserta.
+            </p>
+          ) : null}
         </>
       ),
     });
@@ -1123,6 +1259,61 @@ export function ProgramRegistrationForm({
           Kolom bertanda bintang (*) wajib diisi.
         </p>
       </div>
+
+      {cohortSummary.enabled ? (
+        <section
+          aria-labelledby="cohort-quota-heading"
+          className="space-y-3 rounded-xl border border-zinc-300 bg-zinc-50 p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3
+              id="cohort-quota-heading"
+              className="flex items-center gap-2 text-sm font-bold text-zinc-900"
+            >
+              <Users
+                size={16}
+                weight="bold"
+                aria-hidden="true"
+                className="shrink-0 text-amber-800"
+              />
+              Kuota per Angkatan
+            </h3>
+            <span className="text-xs font-medium text-zinc-600">
+              Terbuka untuk {cohortSummary.items.length} angkatan
+            </span>
+          </div>
+          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {cohortSummary.items.map((item) => (
+              <li
+                key={item.angkatan}
+                className={
+                  item.isFull
+                    ? "min-w-0 rounded-xl border border-red-600 bg-red-50 p-3"
+                    : "min-w-0 rounded-xl border border-emerald-600 bg-emerald-50 p-3"
+                }
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-bold text-zinc-900">
+                    {item.angkatan}
+                  </span>
+                  <span
+                    className={
+                      item.isFull
+                        ? "text-xs font-bold text-red-800"
+                        : "text-xs font-bold text-emerald-900"
+                    }
+                  >
+                    {item.isFull ? "Penuh" : `Sisa ${item.remaining}`}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-medium text-zinc-700 break-words">
+                  {item.registered}/{item.maxQuota} peserta
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <fieldset disabled={busy} className="m-0 min-w-0 space-y-5 border-0 p-0">
         <div className="min-w-0 space-y-1.5">

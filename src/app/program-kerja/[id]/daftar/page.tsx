@@ -13,9 +13,13 @@ import {
   Users,
 } from "@phosphor-icons/react/dist/ssr";
 import { DetailHeader } from "@/components/detail/detail-header";
-import { ProgramRegistrationForm } from "@/components/programs/program-registration-form";
+import {
+  buildCohortQuotaSummary,
+  ProgramRegistrationForm,
+} from "@/components/programs/program-registration-form";
 import Link from "@/components/ui/navigation-link";
 import { loadProgramRegistrationPage } from "@/data/programs";
+import { normalizeProgramFormConfig } from "@/domain/program-form-config";
 import { PROGRAM_STATUSES } from "@/domain/programs";
 
 const getProgramRegistrationData = cache((id: string) =>
@@ -61,12 +65,19 @@ export default async function ProgramRegistrationPage({
     notFound();
   }
 
-  const { program, registeredCount, configured } = data;
+  const { program, registeredCount, cohortCounts, configured } = data;
+  const cohortSummary = buildCohortQuotaSummary(
+    normalizeProgramFormConfig(program.registrationFormConfig),
+    cohortCounts,
+  );
   const hasQuota = program.registrationMaxQuota !== null && configured;
-  const isQuotaFull =
+  const hasCohortQuota = configured && cohortSummary.enabled;
+  const isOverallQuotaFull =
     hasQuota &&
     program.registrationMaxQuota !== null &&
     registeredCount >= program.registrationMaxQuota;
+  const isQuotaFull =
+    isOverallQuotaFull || (hasCohortQuota && cohortSummary.allFull);
 
   return (
     <>
@@ -220,7 +231,7 @@ export default async function ProgramRegistrationPage({
                         {program.registrationMaxQuota} peserta
                       </span>
                       {isQuotaFull ? (
-                        <span className="inline-block rounded-md border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-bold text-red-800">
+                        <span className="inline-block rounded-md border border-red-600 bg-red-50 px-2 py-0.5 text-xs font-bold text-red-800">
                           Kuota penuh
                         </span>
                       ) : null}
@@ -229,6 +240,51 @@ export default async function ProgramRegistrationPage({
                 </div>
               ) : null}
             </dl>
+
+            {hasCohortQuota ? (
+              <div className="border-t border-zinc-200 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                    Kuota per Angkatan
+                  </p>
+                  {cohortSummary.allFull ? (
+                    <span className="inline-block rounded-md border border-red-600 bg-red-50 px-2 py-0.5 text-xs font-bold text-red-800">
+                      Kuota penuh
+                    </span>
+                  ) : null}
+                </div>
+                <ul className="mt-2.5 space-y-2 text-sm">
+                  {cohortSummary.items.map((item) => (
+                    <li
+                      key={item.angkatan}
+                      className={
+                        item.isFull
+                          ? "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-600 bg-red-50 px-3 py-2"
+                          : "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-300 bg-white px-3 py-2"
+                      }
+                    >
+                      <span className="font-semibold text-zinc-900">
+                        Angkatan {item.angkatan}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-medium text-zinc-700">
+                          {item.registered}/{item.maxQuota} peserta
+                        </span>
+                        <span
+                          className={
+                            item.isFull
+                              ? "font-bold text-red-800"
+                              : "font-bold text-emerald-800"
+                          }
+                        >
+                          {item.isFull ? "Penuh" : `Sisa ${item.remaining}`}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {program.benefits.length > 0 ? (
               <div className="border-t border-zinc-200 pt-4">
@@ -266,6 +322,7 @@ export default async function ProgramRegistrationPage({
             <ProgramRegistrationForm
               program={program}
               registeredCount={registeredCount}
+              cohortCounts={cohortCounts}
               configured={configured}
             />
           </div>
