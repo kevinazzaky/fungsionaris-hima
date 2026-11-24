@@ -5,11 +5,13 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { createElement } from "react";
+import * as jsxRuntime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Cake } from "@phosphor-icons/react/dist/ssr";
 import { ProgramPeriodTabs } from "../src/components/detail/program-period-tabs";
 import { ProgramModal } from "../src/components/home/program-modal";
 import {
+  buildCohortQuotaSummary,
   ProgramRegistrationConfirmation,
   ProgramRegistrationForm,
   ProgramRegistrationPrintableReceipt,
@@ -19,6 +21,7 @@ import {
 import { ValidationError } from "../src/domain/admin";
 import {
   DEFAULT_PROGRAM_FORM_CONFIG,
+  normalizeProgramFormConfig,
   type ProgramFormConfig,
 } from "../src/domain/program-form-config";
 import type { Program } from "../src/domain/programs";
@@ -620,7 +623,245 @@ test("modal program kerja mengarahkan pendaftaran internal ke halaman pendaftara
   assert.doesNotMatch(modalHtml, /—/);
 });
 
-test("seluruh file UI publik program pendaftaran bebas dari karakter em dash", () => {
+test("buildCohortQuotaSummary menghitung sisa slot dan status penuh secara akurat", () => {
+  const defaultSummary = buildCohortQuotaSummary(DEFAULT_PROGRAM_FORM_CONFIG, {
+    "2023": 5,
+  });
+  assert.deepEqual(defaultSummary, {
+    enabled: false,
+    items: [],
+    allFull: false,
+  });
+
+  const disabledWithTiersConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    cohortQuotas: {
+      enabled: false,
+      tiers: [
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 5 },
+      ],
+    },
+  };
+  const disabledSummary = buildCohortQuotaSummary(disabledWithTiersConfig, {
+    "2023": 5,
+    "2024": 5,
+  });
+  assert.equal(disabledSummary.enabled, false);
+  assert.equal(disabledSummary.allFull, false);
+  assert.equal(disabledSummary.items.length, 2);
+
+  const cohortConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    cohortQuotas: {
+      enabled: true,
+      tiers: [
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 5 },
+        { angkatan: "2025", maxQuota: 5 },
+        { angkatan: "2026", maxQuota: 5 },
+      ],
+    },
+  };
+  const partialSummary = buildCohortQuotaSummary(cohortConfig, {
+    "2023": 5,
+    "2024": 2,
+    "2025": -3,
+    "2026": 7,
+  });
+  assert.equal(partialSummary.enabled, true);
+  assert.equal(partialSummary.allFull, false);
+  assert.deepEqual(partialSummary.items, [
+    { angkatan: "2023", maxQuota: 5, registered: 5, remaining: 0, isFull: true },
+    { angkatan: "2024", maxQuota: 5, registered: 2, remaining: 3, isFull: false },
+    { angkatan: "2025", maxQuota: 5, registered: 0, remaining: 5, isFull: false },
+    { angkatan: "2026", maxQuota: 5, registered: 7, remaining: 0, isFull: true },
+  ]);
+
+  const fullSummary = buildCohortQuotaSummary(cohortConfig, {
+    "2023": 5,
+    "2024": 5,
+    "2025": 5,
+    "2026": 5,
+  });
+  assert.equal(fullSummary.enabled, true);
+  assert.equal(fullSummary.allFull, true);
+});
+
+test("formulir pendaftaran mode default tetap menampilkan angkatan 2020 sampai 2026 tanpa panel kuota angkatan", () => {
+  const html = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: baseInternalProgram,
+      registeredCount: 4,
+      configured: true,
+    }),
+  );
+  for (const year of ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]) {
+    assert.ok(
+      html.includes(`<option value="${year}">${year}</option>`),
+      `Expected default option ${year}`,
+    );
+  }
+  assert.equal(html.includes("Kuota per Angkatan"), false);
+  assert.doesNotMatch(html, /[\u2014\u2013]/);
+});
+
+test("formulir pendaftaran dengan cohortQuotas 2023-2026 membatasi whitelist, menonaktifkan angkatan penuh, dan menolak angkatan penuh di validasi klien", () => {
+  const cohortConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    cohortQuotas: {
+      enabled: true,
+      tiers: [
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 5 },
+        { angkatan: "2025", maxQuota: 5 },
+        { angkatan: "2026", maxQuota: 5 },
+      ],
+    },
+  };
+  const cohortCounts = { "2023": 5, "2024": 2, "2025": 0, "2026": 4 };
+
+  const html = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationFormConfig: cohortConfig,
+      },
+      registeredCount: 11,
+      cohortCounts,
+      configured: true,
+    }),
+  );
+
+  assert.match(html, /Kuota per Angkatan/);
+  assert.match(html, /5\/5 peserta/);
+  assert.match(html, /2\/5 peserta/);
+  assert.match(html, /0\/5 peserta/);
+  assert.match(html, /4\/5 peserta/);
+  assert.match(html, /Sisa 3/);
+  assert.match(html, /Sisa 5/);
+  assert.match(html, /Sisa 1/);
+
+  for (const excluded of ["2020", "2021", "2022"]) {
+    assert.equal(
+      html.includes(`value="${excluded}"`),
+      false,
+      `Angkatan ${excluded} tidak boleh muncul di dropdown whitelist`,
+    );
+  }
+  assert.match(
+    html,
+    /<option value="2023" disabled="">2023 \(Penuh - 5\/5\)<\/option>/,
+  );
+  assert.match(
+    html,
+    /<option value="2024">2024 \(Sisa 3 dari 5\)<\/option>/,
+  );
+  assert.match(
+    html,
+    /<option value="2025">2025 \(Sisa 5 dari 5\)<\/option>/,
+  );
+  assert.match(
+    html,
+    /<option value="2026">2026 \(Sisa 1 dari 5\)<\/option>/,
+  );
+  assert.doesNotMatch(html, /[\u2014\u2013]/);
+
+  const validPayload = validateAndBuildRegistrationPayload(
+    baseInternalProgram.id,
+    {
+      nama: "I Made Santika",
+      nim: "24010101",
+      angkatan: "2024",
+      noHp: "081234567890",
+      idLine: "santika_ti",
+      email: "santika@undiknas.ac.id",
+      catatan: "",
+      customValues: {},
+    },
+    cohortConfig,
+    cohortCounts,
+  );
+  assert.equal(validPayload.angkatan, "2024");
+
+  assert.throws(
+    () =>
+      validateAndBuildRegistrationPayload(
+        baseInternalProgram.id,
+        {
+          nama: "I Made Santika",
+          nim: "22010101",
+          angkatan: "2022",
+          noHp: "081234567890",
+          idLine: "santika_ti",
+          email: "",
+          catatan: "",
+          customValues: {},
+        },
+        cohortConfig,
+        cohortCounts,
+      ),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      /2023, 2024, 2025, 2026/.test(error.message),
+  );
+
+  assert.throws(
+    () =>
+      validateAndBuildRegistrationPayload(
+        baseInternalProgram.id,
+        {
+          nama: "I Made Santika",
+          nim: "23010101",
+          angkatan: "2023",
+          noHp: "081234567890",
+          idLine: "santika_ti",
+          email: "",
+          catatan: "",
+          customValues: {},
+        },
+        cohortConfig,
+        cohortCounts,
+      ),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      /angkatan 2023 sudah penuh/i.test(error.message),
+  );
+});
+
+test("formulir pendaftaran menampilkan notice penuh saat seluruh kuota angkatan terisi penuh", () => {
+  const cohortConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    cohortQuotas: {
+      enabled: true,
+      tiers: [
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 5 },
+        { angkatan: "2025", maxQuota: 5 },
+        { angkatan: "2026", maxQuota: 5 },
+      ],
+    },
+  };
+  const allFullHtml = renderToStaticMarkup(
+    createElement(ProgramRegistrationForm, {
+      program: {
+        ...baseInternalProgram,
+        registrationMaxQuota: null,
+        registrationFormConfig: cohortConfig,
+      },
+      registeredCount: 20,
+      cohortCounts: { "2023": 5, "2024": 5, "2025": 5, "2026": 5 },
+      configured: true,
+    }),
+  );
+
+  assert.match(allFullHtml, /Kuota Peserta Penuh/);
+  assert.match(allFullHtml, /Seluruh kuota angkatan yang dibuka/);
+  assert.match(allFullHtml, /5\/5 peserta/);
+  assert.doesNotMatch(allFullHtml, /<form|type="submit"|[\u2014\u2013]/);
+});
+
+test("seluruh file UI publik program pendaftaran bebas dari karakter em dash dan en dash", () => {
   const files = [
     "src/app/program-kerja/[id]/daftar/page.tsx",
     "src/components/programs/program-registration-form.tsx",
@@ -629,24 +870,27 @@ test("seluruh file UI publik program pendaftaran bebas dari karakter em dash", (
   ];
   for (const rel of files) {
     const content = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
-    assert.equal(content.includes("—"), false, `Em dash found in ${rel}`);
+    assert.equal(content.includes("\u2014"), false, `Em dash found in ${rel}`);
+    assert.equal(content.includes("\u2013"), false, `En dash found in ${rel}`);
   }
 });
 
-test("generateMetadata halaman daftar proker memanggil notFound() saat program tidak ditemukan atau belum dipublikasikan", async () => {
+test("generateMetadata dan halaman daftar proker memanggil notFound() serta meneruskan cohortCounts dan ringkasan kuota angkatan", async () => {
   class NotFoundSignal extends Error {
     digest = "NEXT_HTTP_ERROR_FALLBACK;404";
   }
   let mockData: {
     program: Program | null;
     registeredCount: number;
+    cohortCounts: Record<string, number>;
     configured: boolean;
-  } = { program: null, registeredCount: 0, configured: true };
-  const stub = {};
+  } = { program: null, registeredCount: 0, cohortCounts: {}, configured: true };
+  let capturedFormProps: Record<string, unknown> | null = null;
+  const stub = () => null;
   const modules: Record<string, unknown> = {
     react: { cache: (fn: unknown) => fn },
-    "react/jsx-runtime": { jsx: () => null, jsxs: () => null, Fragment: "fragment" },
-    "next/image": stub,
+    "react/jsx-runtime": jsxRuntime,
+    "next/image": { default: stub },
     "next/navigation": {
       notFound: () => {
         throw new NotFoundSignal("notFound");
@@ -655,16 +899,30 @@ test("generateMetadata halaman daftar proker memanggil notFound() saat program t
     "@phosphor-icons/react/dist/ssr": new Proxy({}, { get: () => stub }),
     "@/components/detail/detail-header": { DetailHeader: stub },
     "@/components/programs/program-registration-form": {
-      ProgramRegistrationForm: stub,
+      buildCohortQuotaSummary,
+      ProgramRegistrationForm: (props: Record<string, unknown>) => {
+        capturedFormProps = props;
+        return null;
+      },
     },
-    "@/components/ui/navigation-link": stub,
+    "@/components/ui/navigation-link": { default: stub },
     "@/data/programs": {
       loadProgramRegistrationPage: async () => mockData,
     },
-    "@/domain/programs": { PROGRAM_STATUSES: {} },
+    "@/domain/program-form-config": { normalizeProgramFormConfig },
+    "@/domain/programs": {
+      PROGRAM_STATUSES: {
+        open: "Pendaftaran Dibuka",
+        upcoming: "Segera Hadir",
+        closed: "Pendaftaran Ditutup",
+      },
+    },
   };
   const context = {
     exports: {} as {
+      default: (args: {
+        params: Promise<{ id: string }>;
+      }) => Promise<React.ReactElement>;
       generateMetadata: (args: {
         params: Promise<{ id: string }>;
       }) => Promise<{ title?: string }>;
@@ -699,6 +957,7 @@ test("generateMetadata halaman daftar proker memanggil notFound() saat program t
   mockData = {
     program: { ...baseInternalProgram, isPublished: false },
     registeredCount: 0,
+    cohortCounts: {},
     configured: true,
   };
   await assert.rejects(
@@ -708,13 +967,43 @@ test("generateMetadata halaman daftar proker memanggil notFound() saat program t
     NotFoundSignal,
   );
 
+  const cohortConfig: ProgramFormConfig = {
+    ...DEFAULT_PROGRAM_FORM_CONFIG,
+    cohortQuotas: {
+      enabled: true,
+      tiers: [
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 5 },
+      ],
+    },
+  };
   mockData = {
-    program: baseInternalProgram,
-    registeredCount: 0,
+    program: {
+      ...baseInternalProgram,
+      registrationFormConfig: cohortConfig,
+    },
+    registeredCount: 10,
+    cohortCounts: { "2023": 5, "2024": 5 },
     configured: true,
   };
   const meta = await context.exports.generateMetadata({
     params: Promise.resolve({ id: baseInternalProgram.id }),
   });
   assert.match(String(meta.title), /IT Versary & Sertijab 2026/);
+
+  const pageTree = await context.exports.default({
+    params: Promise.resolve({ id: baseInternalProgram.id }),
+  });
+  const pageHtml = renderToStaticMarkup(pageTree);
+  assert.match(pageHtml, /Kuota per Angkatan/);
+  assert.match(pageHtml, /Angkatan 2023/);
+  assert.match(pageHtml, /Angkatan 2024/);
+  assert.match(pageHtml, /5\/5 peserta/);
+  assert.match(pageHtml, /Kuota penuh/);
+  assert.doesNotMatch(pageHtml, /[\u2014\u2013]/);
+  assert.deepEqual(
+    (capturedFormProps as { cohortCounts?: Record<string, number> } | null)
+      ?.cohortCounts,
+    { "2023": 5, "2024": 5 },
+  );
 });
