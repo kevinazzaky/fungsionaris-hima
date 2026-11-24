@@ -5,7 +5,10 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+  createPresetCohortTiers,
   DEFAULT_PROGRAM_FORM_CONFIG,
+  MAX_COHORT_TIERS,
+  validateProgramFormConfig,
   type ProgramFormConfig,
 } from "../src/domain/program-form-config";
 import type { Program } from "../src/domain/programs";
@@ -22,12 +25,20 @@ import {
   ProgramsManager,
 } from "../src/components/admin/programs-manager";
 import {
+  addDraftCohortTier,
+  applyDraftCohortPreset,
+  buildProgramFormConfigInput,
   confirmDiscardUnsavedFormSettings,
   createProgramFormSettingsDraft,
+  getCohortQuotaTierDrafts,
   isProgramFormSettingsDirty,
   ProgramFormSettingsManager,
+  removeDraftCohortTier,
+  summarizeCohortQuotaDraft,
   syncProgramFormSettingsWithReload,
+  toggleDraftCohortQuotas,
   UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE,
+  updateDraftCohortTier,
 } from "../src/components/admin/program-form-settings-manager";
 import {
   formatCustomCellValue,
@@ -835,6 +846,301 @@ test("ParticipantEditor merender option fallback untuk nilai select terdahulu ya
   assert.doesNotMatch(emptyHtml, EM_DASH_PATTERN);
 });
 
+test("kontrol kuota per angkatan pada ProgramFormSettingsManager, ProgramFormBuilder, dan ProgramListRow", () => {
+  const defaultHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [sampleInternalProgram],
+      selectedProgramId: sampleInternalProgram.id,
+    }),
+  );
+  assert.match(defaultHtml, /Batasi kuota peserta per angkatan \(opsional\)/);
+  assert.match(defaultHtml, /name="cohortQuotasEnabled"/);
+  assert.doesNotMatch(defaultHtml, /name="cohortQuotasEnabled"[^>]*checked=""/);
+  assert.doesNotMatch(defaultHtml, /admin-cohort-quota-box/);
+  assert.doesNotMatch(
+    defaultHtml,
+    /Dikunci ke Wajib selama kuota per angkatan aktif\./,
+  );
+  assert.doesNotMatch(defaultHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(defaultHtml, EN_DASH_PATTERN);
+
+  const presetTiers = createPresetCohortTiers(2023, 2026, 5);
+  const cohortProgram: Program = {
+    ...sampleInternalProgram,
+    registrationMaxQuota: 25,
+    registrationFormConfig: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG,
+      cohortQuotas: {
+        enabled: true,
+        tiers: presetTiers,
+      },
+    },
+  };
+
+  const activeHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [cohortProgram],
+      selectedProgramId: cohortProgram.id,
+    }),
+  );
+  for (const needle of [
+    'name="cohortQuotasEnabled" checked=""',
+    "admin-cohort-quota-box",
+    "Preset 2023-2026 (5 peserta)",
+    "+ Tambah angkatan",
+    "4 dari 20 angkatan diatur",
+    "Tahun angkatan",
+    "Kuota maksimal",
+    'value="2023"',
+    'value="2024"',
+    'value="2025"',
+    'value="2026"',
+    'aria-label="Hapus kuota angkatan 2023"',
+    "4 angkatan: total kapasitas 20 peserta",
+    "Kuota maksimal keseluruhan (25 peserta) juga aktif.",
+    "Dikunci ke Wajib selama kuota per angkatan aktif.",
+  ]) {
+    assert.ok(
+      activeHtml.includes(needle),
+      `Missing active cohort UI content: ${needle}`,
+    );
+  }
+  assert.match(
+    activeHtml,
+    /<select[^>]*aria-label="Status kolom Angkatan"[^>]*disabled=""/,
+  );
+  assert.doesNotMatch(activeHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(activeHtml, EN_DASH_PATTERN);
+
+  const disabledWithSavedTiersProgram: Program = {
+    ...cohortProgram,
+    registrationFormConfig: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG,
+      cohortQuotas: {
+        enabled: false,
+        tiers: presetTiers,
+      },
+    },
+  };
+  const disabledSavedHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [disabledWithSavedTiersProgram],
+      selectedProgramId: disabledWithSavedTiersProgram.id,
+    }),
+  );
+  assert.doesNotMatch(disabledSavedHtml, /admin-cohort-quota-box/);
+  assert.match(
+    disabledSavedHtml,
+    /Pengaturan 4 angkatan tetap disimpan dan aktif kembali jika kotak ini dicentang\./,
+  );
+  assert.doesNotMatch(disabledSavedHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(disabledSavedHtml, EN_DASH_PATTERN);
+
+  const maxTierProgram: Program = {
+    ...cohortProgram,
+    registrationFormConfig: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG,
+      cohortQuotas: {
+        enabled: true,
+        tiers: createPresetCohortTiers(2010, 2029, 3),
+      },
+    },
+  };
+  const maxedHtml = renderToStaticMarkup(
+    createElement(ProgramFormSettingsManager, {
+      items: [maxTierProgram],
+      selectedProgramId: maxTierProgram.id,
+    }),
+  );
+  assert.match(maxedHtml, /20 dari 20 angkatan diatur/);
+  assert.match(maxedHtml, /Maksimal 20 angkatan sudah tercapai\./);
+  assert.match(maxedHtml, /disabled=""[^>]*>\+ Tambah angkatan/);
+  assert.doesNotMatch(maxedHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(maxedHtml, EN_DASH_PATTERN);
+
+  // ProgramFormBuilder locks Angkatan select to required when cohortQuotas.enabled is true.
+  const lockedBuilderHtml = renderToStaticMarkup(
+    createElement(ProgramFormBuilder, {
+      value: {
+        ...sampleFormConfig,
+        cohortQuotas: { enabled: true, tiers: [] },
+      },
+      onChange: () => {},
+    }),
+  );
+  assert.match(
+    lockedBuilderHtml,
+    /<select[^>]*aria-label="Status kolom Angkatan"[^>]*disabled=""[^>]*>[\s\S]*?<option value="required" selected="">Wajib<\/option>/,
+  );
+  assert.match(
+    lockedBuilderHtml,
+    /Dikunci ke Wajib selama kuota per angkatan aktif\./,
+  );
+  assert.doesNotMatch(lockedBuilderHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(lockedBuilderHtml, EN_DASH_PATTERN);
+
+  const unlockedBuilderHtml = renderToStaticMarkup(
+    createElement(ProgramFormBuilder, {
+      value: {
+        ...sampleFormConfig,
+        cohortQuotas: { enabled: false, tiers: presetTiers },
+      },
+      onChange: () => {},
+    }),
+  );
+  assert.doesNotMatch(
+    unlockedBuilderHtml,
+    /<select[^>]*aria-label="Status kolom Angkatan"[^>]*disabled=""/,
+  );
+  assert.doesNotMatch(
+    unlockedBuilderHtml,
+    /Dikunci ke Wajib selama kuota per angkatan aktif\./,
+  );
+
+  // ProgramListRow shows cohort badge only for internal programs with enabled cohort quotas.
+  const cohortRowHtml = renderToStaticMarkup(
+    createElement(ProgramListRow, {
+      item: cohortProgram,
+      count: 8,
+      onConfigureForm: () => {},
+      onViewParticipants: () => {},
+      onEdit: () => {},
+      onDelete: () => {},
+    }),
+  );
+  assert.match(cohortRowHtml, /Kuota 4 angkatan/);
+  assert.doesNotMatch(cohortRowHtml, EM_DASH_PATTERN);
+  assert.doesNotMatch(cohortRowHtml, EN_DASH_PATTERN);
+
+  const disabledCohortRowHtml = renderToStaticMarkup(
+    createElement(ProgramListRow, {
+      item: disabledWithSavedTiersProgram,
+      count: 8,
+      onConfigureForm: () => {},
+      onViewParticipants: () => {},
+      onEdit: () => {},
+      onDelete: () => {},
+    }),
+  );
+  assert.doesNotMatch(disabledCohortRowHtml, /Kuota \d+ angkatan/);
+
+  const externalCohortRowHtml = renderToStaticMarkup(
+    createElement(ProgramListRow, {
+      item: {
+        ...sampleExternalProgram,
+        registrationFormConfig: cohortProgram.registrationFormConfig,
+      },
+      count: 0,
+      onConfigureForm: () => {},
+      onViewParticipants: () => {},
+      onEdit: () => {},
+      onDelete: () => {},
+    }),
+  );
+  assert.doesNotMatch(externalCohortRowHtml, /Kuota \d+ angkatan/);
+
+  // Draft state transitions: auto-lock angkatan, preset, raw edits, preserve on disable, omit when empty.
+  const requiredBaseProgram: Program = {
+    ...sampleInternalProgram,
+    registrationFormConfig: DEFAULT_PROGRAM_FORM_CONFIG,
+  };
+  const cleanDraft = createProgramFormSettingsDraft(requiredBaseProgram);
+  assert.equal(isProgramFormSettingsDirty(cleanDraft, requiredBaseProgram), false);
+
+  const enabledEmpty = toggleDraftCohortQuotas(cleanDraft, true);
+  assert.equal(enabledEmpty.registrationFormConfig.builtInFields.angkatan, "required");
+  assert.equal(isProgramFormSettingsDirty(enabledEmpty, requiredBaseProgram), true);
+
+  const toggledBackOff = toggleDraftCohortQuotas(enabledEmpty, false);
+  assert.equal(toggledBackOff.registrationFormConfig.cohortQuotas, undefined);
+  assert.equal(isProgramFormSettingsDirty(toggledBackOff, requiredBaseProgram), false);
+  assert.equal(
+    validateProgramFormConfig(buildProgramFormConfigInput(toggledBackOff))
+      .cohortQuotas,
+    undefined,
+  );
+
+  // Enabling from hidden angkatan automatically forces angkatan to required.
+  const hiddenDraft = createProgramFormSettingsDraft(sampleInternalProgram);
+  assert.equal(hiddenDraft.registrationFormConfig.builtInFields.angkatan, "hidden");
+  const enabledFromHidden = toggleDraftCohortQuotas(hiddenDraft, true);
+  assert.equal(
+    enabledFromHidden.registrationFormConfig.builtInFields.angkatan,
+    "required",
+  );
+
+  // Preset 2023-2026 @ 5 and preserving tiers when toggling off.
+  const withPreset = applyDraftCohortPreset(enabledEmpty, 2023, 2026, 5);
+  assert.equal(getCohortQuotaTierDrafts(withPreset).length, 4);
+  assert.deepEqual(
+    summarizeCohortQuotaDraft(getCohortQuotaTierDrafts(withPreset)),
+    { tierCount: 4, totalCapacity: 20 },
+  );
+  const validatedEnabled = validateProgramFormConfig(
+    buildProgramFormConfigInput(withPreset),
+  );
+  assert.deepEqual(validatedEnabled.cohortQuotas, {
+    enabled: true,
+    tiers: presetTiers,
+  });
+
+  const disabledWithTiers = toggleDraftCohortQuotas(withPreset, false);
+  assert.equal(isProgramFormSettingsDirty(disabledWithTiers, requiredBaseProgram), true);
+  const validatedDisabled = validateProgramFormConfig(
+    buildProgramFormConfigInput(disabledWithTiers),
+  );
+  assert.deepEqual(validatedDisabled.cohortQuotas, {
+    enabled: false,
+    tiers: presetTiers,
+  });
+
+  // Raw typing stays intact without sorting/stripping and fails domain validation until valid.
+  let manualDraft = addDraftCohortTier(enabledEmpty, "t-1");
+  manualDraft = updateDraftCohortTier(manualDraft, 0, {
+    angkatan: "202",
+    maxQuota: "",
+  });
+  assert.deepEqual(getCohortQuotaTierDrafts(manualDraft), [
+    { id: "t-1", angkatan: "202", maxQuota: "" },
+  ]);
+  assert.throws(() =>
+    validateProgramFormConfig(buildProgramFormConfigInput(manualDraft)),
+  );
+  manualDraft = updateDraftCohortTier(manualDraft, 0, {
+    angkatan: "2026",
+    maxQuota: "8",
+  });
+  manualDraft = addDraftCohortTier(manualDraft, "t-2");
+  manualDraft = updateDraftCohortTier(manualDraft, 1, {
+    angkatan: "2024",
+    maxQuota: "6",
+  });
+  // Unsorted while typing, sorted on domain validation.
+  assert.deepEqual(
+    getCohortQuotaTierDrafts(manualDraft).map((tier) => tier.angkatan),
+    ["2026", "2024"],
+  );
+  const validatedManual = validateProgramFormConfig(
+    buildProgramFormConfigInput(manualDraft),
+  );
+  assert.deepEqual(validatedManual.cohortQuotas, {
+    enabled: true,
+    tiers: [
+      { angkatan: "2024", maxQuota: 6 },
+      { angkatan: "2026", maxQuota: 8 },
+    ],
+  });
+
+  const removedDraft = removeDraftCohortTier(manualDraft, 0);
+  assert.equal(getCohortQuotaTierDrafts(removedDraft).length, 1);
+
+  // Enforces MAX_COHORT_TIERS cap.
+  let cappedDraft = applyDraftCohortPreset(enabledEmpty, 2010, 2029, 2);
+  assert.equal(getCohortQuotaTierDrafts(cappedDraft).length, MAX_COHORT_TIERS);
+  cappedDraft = addDraftCohortTier(cappedDraft, "overflow");
+  assert.equal(getCohortQuotaTierDrafts(cappedDraft).length, MAX_COHORT_TIERS);
+});
+
 test("seluruh file Admin UI yang diubah bebas em/en dash dan memenuhi penjagaan aksesibilitas CSS", () => {
   const files = [
     "src/app/admin/(panel)/program-kerja/page.tsx",
@@ -871,6 +1177,18 @@ test("seluruh file Admin UI yang diubah bebas em/en dash dan memenuhi penjagaan 
   assert.match(
     css,
     /\.admin-form-settings-savebar\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-cohort-quota-box\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-cohort-tier-row\s*\{[^}]*border:\s*1px solid #8c8c82/,
+  );
+  assert.match(
+    css,
+    /\.admin-cohort-summary\s*\{[^}]*border-top:\s*1px solid #8c8c82/,
   );
   assert.match(
     css,
