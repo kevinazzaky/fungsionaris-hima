@@ -733,14 +733,7 @@ test("formulir pendaftaran dengan cohortQuotas 2023-2026 membatasi whitelist, me
     }),
   );
 
-  assert.match(html, /Kuota per Angkatan/);
-  assert.match(html, /5\/5 peserta/);
-  assert.match(html, /2\/5 peserta/);
-  assert.match(html, /0\/5 peserta/);
-  assert.match(html, /4\/5 peserta/);
-  assert.match(html, /Sisa 3/);
-  assert.match(html, /Sisa 5/);
-  assert.match(html, /Sisa 1/);
+  assert.doesNotMatch(html, /Kuota per Angkatan/);
 
   for (const excluded of ["2020", "2021", "2022"]) {
     assert.equal(

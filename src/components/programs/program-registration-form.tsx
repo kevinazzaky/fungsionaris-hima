@@ -1213,61 +1213,6 @@ export function ProgramRegistrationForm({
         </p>
       </div>
 
-      {cohortSummary.enabled ? (
-        <section
-          aria-labelledby="cohort-quota-heading"
-          className="space-y-3 rounded-xl border border-zinc-300 bg-zinc-50 p-4"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3
-              id="cohort-quota-heading"
-              className="flex items-center gap-2 text-sm font-bold text-zinc-900"
-            >
-              <Users
-                size={16}
-                weight="bold"
-                aria-hidden="true"
-                className="shrink-0 text-amber-800"
-              />
-              Kuota per Angkatan
-            </h3>
-            <span className="text-xs font-medium text-zinc-600">
-              Terbuka untuk {cohortSummary.items.length} angkatan
-            </span>
-          </div>
-          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {cohortSummary.items.map((item) => (
-              <li
-                key={item.angkatan}
-                className={
-                  item.isFull
-                    ? "min-w-0 rounded-xl border border-red-600 bg-red-50 p-3"
-                    : "min-w-0 rounded-xl border border-emerald-600 bg-emerald-50 p-3"
-                }
-              >
-                <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="text-sm font-bold text-zinc-900">
-                    {item.angkatan}
-                  </span>
-                  <span
-                    className={
-                      item.isFull
-                        ? "text-xs font-bold text-red-800"
-                        : "text-xs font-bold text-emerald-900"
-                    }
-                  >
-                    {item.isFull ? "Penuh" : `Sisa ${item.remaining}`}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs font-medium text-zinc-700 break-words">
-                  {item.registered}/{item.maxQuota} peserta
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       <fieldset disabled={busy} className="m-0 min-w-0 space-y-5 border-0 p-0">
         <div className="min-w-0 space-y-1.5">
           <label
