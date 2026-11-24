@@ -1,4 +1,5 @@
 import { ValidationError } from "../domain/admin";
+import { resolveCohortQuotaConfig } from "../domain/program-form-config";
 import type { ProgramRepository } from "../domain/programs";
 import {
   ConflictError,
@@ -28,7 +29,8 @@ export async function registerProgram(
   registrationRepository: Pick<
     ProgramRegistrationRepository,
     "countByProgram" | "create"
-  >,
+  > &
+    Partial<Pick<ProgramRegistrationRepository, "countsByCohort">>,
   programId: string,
   data: Record<string, unknown>,
 ): Promise<RegisterProgramResult> {
@@ -56,6 +58,26 @@ export async function registerProgram(
         "Kuota peserta untuk program kerja ini sudah penuh.",
         "quota",
       );
+  }
+  const cohortConfig = resolveCohortQuotaConfig(program.registrationFormConfig);
+  if (
+    cohortConfig.enabled &&
+    typeof registrationRepository.countsByCohort === "function"
+  ) {
+    const tier = cohortConfig.tiers.find(
+      (entry) => entry.angkatan === input.angkatan,
+    );
+    if (tier) {
+      const cohortCounts = await registrationRepository.countsByCohort(
+        program.id,
+      );
+      if ((cohortCounts[tier.angkatan] ?? 0) >= tier.maxQuota) {
+        throw new ConflictError(
+          `Kuota pendaftaran untuk angkatan ${tier.angkatan} sudah penuh (maksimal ${tier.maxQuota} peserta).`,
+          "quota",
+        );
+      }
+    }
   }
   try {
     const registration = await registrationRepository.create(program.id, input);

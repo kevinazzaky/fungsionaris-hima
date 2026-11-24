@@ -9,6 +9,7 @@ import { programRegistrationRepository } from "./repositories/program-registrati
 export type PublicProgramRegistrationPageData = {
   program: Program | null;
   registeredCount: number;
+  cohortCounts: Record<string, number>;
   configured: boolean;
 };
 
@@ -34,6 +35,7 @@ export async function loadProgramRegistrationPage(
     return {
       program: match ? toPublicProgram(match) : null,
       registeredCount: 0,
+      cohortCounts: {},
       configured: false,
     };
   }
@@ -43,14 +45,18 @@ export async function loadProgramRegistrationPage(
     return {
       program: null,
       registeredCount: 0,
+      cohortCounts: {},
       configured: true,
     };
   }
-  const registeredCount =
-    await programRegistrationRepository.countByProgram(program.id);
+  const [registeredCount, cohortCounts] = await Promise.all([
+    programRegistrationRepository.countByProgram(program.id),
+    programRegistrationRepository.countsByCohort(program.id),
+  ]);
   return {
     program: toPublicProgram(program),
     registeredCount,
+    cohortCounts,
     configured: true,
   };
 }

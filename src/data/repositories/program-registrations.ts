@@ -4,6 +4,7 @@ import { ValidationError } from "@/domain/admin";
 import {
   normalizeProgramFormConfig,
   normalizeStoredCustomResponses,
+  resolveCohortQuotaConfig,
 } from "@/domain/program-form-config";
 import {
   ConflictError,
@@ -90,6 +91,26 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
               "Kuota peserta untuk program kerja ini sudah penuh.",
               "quota",
             );
+        }
+        const cohortConfig = resolveCohortQuotaConfig(formConfig);
+        if (cohortConfig.enabled) {
+          const tier = cohortConfig.tiers.find(
+            (entry) => entry.angkatan === validated.angkatan,
+          );
+          if (!tier) {
+            throw new ValidationError(
+              `Pendaftaran program ini hanya dibuka untuk angkatan ${cohortConfig.tiers.map((entry) => entry.angkatan).join(", ")}.`,
+            );
+          }
+          const cohortRegistered = await tx.programRegistration.count({
+            where: { programId, angkatan: validated.angkatan },
+          });
+          if (cohortRegistered >= tier.maxQuota) {
+            throw new ConflictError(
+              `Kuota pendaftaran untuk angkatan ${tier.angkatan} sudah penuh (maksimal ${tier.maxQuota} peserta).`,
+              "quota",
+            );
+          }
         }
         const created = await tx.programRegistration.create({
           data: {
@@ -222,6 +243,19 @@ export const programRegistrationRepository: ProgramRegistrationRepository = {
     });
     const counts: Record<string, number> = {};
     for (const row of grouped) counts[row.programId] = row._count._all;
+    return counts;
+  },
+  async countsByCohort(programId) {
+    if (!UUID_PATTERN.test(programId)) return {};
+    const grouped = await getPrisma().programRegistration.groupBy({
+      by: ["angkatan"],
+      where: { programId },
+      _count: { _all: true },
+    });
+    const counts: Record<string, number> = {};
+    for (const row of grouped) {
+      if (row.angkatan) counts[row.angkatan] = row._count._all;
+    }
     return counts;
   },
 };
