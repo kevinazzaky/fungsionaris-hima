@@ -38,9 +38,22 @@ export type CustomFormField = {
   options: string[];
 };
 
+export const MAX_COHORT_TIERS = 20;
+
+export type CohortQuotaTier = {
+  angkatan: string;
+  maxQuota: number;
+};
+
+export type CohortQuotaConfig = {
+  enabled: boolean;
+  tiers: CohortQuotaTier[];
+};
+
 export type ProgramFormConfig = {
   builtInFields: Record<BuiltInFieldKey, BuiltInFieldMode>;
   customFields: CustomFormField[];
+  cohortQuotas?: CohortQuotaConfig;
 };
 
 export type ProgramCustomResponses = Record<string, string | boolean>;
@@ -58,9 +71,11 @@ export const DEFAULT_PROGRAM_FORM_CONFIG: ProgramFormConfig = {
 
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/;
 const CUSTOM_FIELD_ID_PATTERN = /^[a-zA-Z0-9_-]{2,40}$/;
+const COHORT_YEAR_PATTERN = /^(19|20)\d{2}$/;
 const RESERVED_OBJECT_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const MAX_CUSTOM_FIELDS = 20;
 const MAX_SELECT_OPTIONS = 30;
+const MAX_COHORT_QUOTA_VALUE = 2147483647;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -71,6 +86,34 @@ export function cloneDefaultProgramFormConfig(): ProgramFormConfig {
     builtInFields: { ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields },
     customFields: [],
   };
+}
+
+export function resolveCohortQuotaConfig(
+  config?: ProgramFormConfig | null,
+): CohortQuotaConfig {
+  const tiers = config?.cohortQuotas?.tiers
+    ? config.cohortQuotas.tiers.map((tier) => ({ ...tier }))
+    : [];
+  return {
+    enabled: Boolean(config?.cohortQuotas?.enabled && tiers.length > 0),
+    tiers,
+  };
+}
+
+export function createPresetCohortTiers(
+  startYear = 2023,
+  endYear = 2026,
+  maxQuota = 5,
+): CohortQuotaTier[] {
+  const tiers: CohortQuotaTier[] = [];
+  for (
+    let year = startYear;
+    year <= endYear && tiers.length < MAX_COHORT_TIERS;
+    year += 1
+  ) {
+    tiers.push({ angkatan: String(year), maxQuota });
+  }
+  return tiers;
 }
 
 function singleLineConfigText(
@@ -224,6 +267,124 @@ function validateCustomField(
   };
 }
 
+function parseOptionalCohortMaxQuota(value: unknown): number | null {
+  if (typeof value === "string") {
+    if (CONTROL_CHAR_PATTERN.test(value)) return null;
+    const trimmed = value.trim();
+    if (!/^\d+$/.test(trimmed)) return null;
+    const parsed = Number(trimmed);
+    if (
+      !Number.isSafeInteger(parsed) ||
+      parsed < 1 ||
+      parsed > MAX_COHORT_QUOTA_VALUE
+    ) {
+      return null;
+    }
+    return parsed;
+  }
+  if (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_COHORT_QUOTA_VALUE
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function validateCohortMaxQuota(value: unknown, angkatan: string): number {
+  if (typeof value === "string" && CONTROL_CHAR_PATTERN.test(value)) {
+    throw new ValidationError(
+      `Kuota angkatan ${angkatan} tidak boleh mengandung karakter kontrol.`,
+    );
+  }
+  const parsed = parseOptionalCohortMaxQuota(value);
+  if (parsed === null) {
+    throw new ValidationError(
+      `Kuota angkatan ${angkatan} harus berupa bilangan bulat antara 1 dan ${MAX_COHORT_QUOTA_VALUE}.`,
+    );
+  }
+  return parsed;
+}
+
+function validateCohortQuotas(
+  raw: unknown,
+  builtInFields: Record<BuiltInFieldKey, BuiltInFieldMode>,
+): CohortQuotaConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!isPlainObject(raw)) {
+    throw new ValidationError(
+      "Pengaturan kuota per angkatan harus berupa objek.",
+    );
+  }
+
+  let enabled = false;
+  if (raw.enabled !== undefined) {
+    if (typeof raw.enabled !== "boolean") {
+      throw new ValidationError(
+        "Status aktif kuota per angkatan harus berupa boolean.",
+      );
+    }
+    enabled = raw.enabled;
+  }
+
+  const rawTiers = raw.tiers === undefined ? [] : raw.tiers;
+  if (!Array.isArray(rawTiers)) {
+    throw new ValidationError(
+      "Daftar kuota per angkatan harus berupa array.",
+    );
+  }
+  if (rawTiers.length > MAX_COHORT_TIERS) {
+    throw new ValidationError(
+      `Kuota per angkatan maksimal ${MAX_COHORT_TIERS} angkatan.`,
+    );
+  }
+
+  const seenAngkatan = new Set<string>();
+  const tiers: CohortQuotaTier[] = [];
+  for (let index = 0; index < rawTiers.length; index += 1) {
+    const entry = rawTiers[index];
+    if (!isPlainObject(entry)) {
+      throw new ValidationError(`Kuota angkatan ke-${index + 1} tidak valid.`);
+    }
+    const angkatan = singleLineConfigText(
+      entry.angkatan,
+      `Angkatan ke-${index + 1}`,
+      4,
+      4,
+      true,
+    );
+    if (!COHORT_YEAR_PATTERN.test(angkatan)) {
+      throw new ValidationError("Angkatan harus berupa tahun empat digit.");
+    }
+    if (seenAngkatan.has(angkatan)) {
+      throw new ValidationError(`Angkatan ${angkatan} tidak boleh duplikat.`);
+    }
+    seenAngkatan.add(angkatan);
+    const maxQuota = validateCohortMaxQuota(entry.maxQuota, angkatan);
+    tiers.push({ angkatan, maxQuota });
+  }
+
+  tiers.sort((a, b) => Number(a.angkatan) - Number(b.angkatan));
+
+  if (enabled) {
+    if (tiers.length < 1) {
+      throw new ValidationError(
+        "Tambahkan minimal 1 angkatan sebelum mengaktifkan kuota per angkatan.",
+      );
+    }
+    if (builtInFields.angkatan !== "required") {
+      throw new ValidationError(
+        "Kolom bawaan Angkatan wajib diatur Wajib saat kuota per angkatan aktif.",
+      );
+    }
+  }
+
+  if (!enabled && tiers.length === 0) return undefined;
+  return { enabled, tiers };
+}
+
 export function validateProgramFormConfig(raw: unknown): ProgramFormConfig {
   if (!isPlainObject(raw)) {
     throw new ValidationError(
@@ -231,24 +392,29 @@ export function validateProgramFormConfig(raw: unknown): ProgramFormConfig {
     );
   }
   const builtInFields = validateBuiltInFields(raw.builtInFields);
-  if (raw.customFields === undefined) {
-    return { builtInFields, customFields: [] };
-  }
-  if (!Array.isArray(raw.customFields)) {
-    throw new ValidationError(
-      "Daftar kolom tambahan formulir harus berupa array.",
+  let customFields: CustomFormField[] = [];
+  if (raw.customFields !== undefined) {
+    if (!Array.isArray(raw.customFields)) {
+      throw new ValidationError(
+        "Daftar kolom tambahan formulir harus berupa array.",
+      );
+    }
+    if (raw.customFields.length > MAX_CUSTOM_FIELDS) {
+      throw new ValidationError(
+        `Kolom tambahan formulir maksimal ${MAX_CUSTOM_FIELDS} kolom.`,
+      );
+    }
+    const seenIds = new Set<string>();
+    customFields = raw.customFields.map((entry, index) =>
+      validateCustomField(entry, index, seenIds),
     );
   }
-  if (raw.customFields.length > MAX_CUSTOM_FIELDS) {
-    throw new ValidationError(
-      `Kolom tambahan formulir maksimal ${MAX_CUSTOM_FIELDS} kolom.`,
-    );
+  const cohortQuotas = validateCohortQuotas(raw.cohortQuotas, builtInFields);
+  const result: ProgramFormConfig = { builtInFields, customFields };
+  if (cohortQuotas) {
+    result.cohortQuotas = cohortQuotas;
   }
-  const seenIds = new Set<string>();
-  const customFields = raw.customFields.map((entry, index) =>
-    validateCustomField(entry, index, seenIds),
-  );
-  return { builtInFields, customFields };
+  return result;
 }
 
 function parseJsonIfString(raw: unknown): unknown {
@@ -355,7 +521,48 @@ export function normalizeProgramFormConfig(raw: unknown): ProgramFormConfig {
     }
   }
 
-  return { builtInFields, customFields };
+  let cohortQuotas: CohortQuotaConfig | undefined;
+  if (isPlainObject(parsed.cohortQuotas)) {
+    const tiers: CohortQuotaTier[] = [];
+    const seenAngkatan = new Set<string>();
+    if (Array.isArray(parsed.cohortQuotas.tiers)) {
+      for (const entry of parsed.cohortQuotas.tiers) {
+        if (tiers.length >= MAX_COHORT_TIERS) break;
+        if (!isPlainObject(entry)) continue;
+        if (
+          typeof entry.angkatan !== "string" ||
+          CONTROL_CHAR_PATTERN.test(entry.angkatan)
+        ) {
+          continue;
+        }
+        const angkatan = entry.angkatan.trim();
+        if (
+          !COHORT_YEAR_PATTERN.test(angkatan) ||
+          seenAngkatan.has(angkatan)
+        ) {
+          continue;
+        }
+        const maxQuota = parseOptionalCohortMaxQuota(entry.maxQuota);
+        if (maxQuota === null) continue;
+        seenAngkatan.add(angkatan);
+        tiers.push({ angkatan, maxQuota });
+      }
+    }
+    tiers.sort((a, b) => Number(a.angkatan) - Number(b.angkatan));
+    const enabled = parsed.cohortQuotas.enabled === true && tiers.length > 0;
+    if (enabled) {
+      builtInFields.angkatan = "required";
+    }
+    if (enabled || tiers.length > 0) {
+      cohortQuotas = { enabled, tiers };
+    }
+  }
+
+  const result: ProgramFormConfig = { builtInFields, customFields };
+  if (cohortQuotas) {
+    result.cohortQuotas = cohortQuotas;
+  }
+  return result;
 }
 
 export function normalizeStoredCustomResponses(

@@ -7,6 +7,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { ValidationError } from "../src/domain/admin";
 import {
   DEFAULT_PROGRAM_FORM_CONFIG,
+  createPresetCohortTiers,
   type ProgramFormConfig,
 } from "../src/domain/program-form-config";
 import type { Program, ProgramRepository } from "../src/domain/programs";
@@ -312,6 +313,7 @@ test("use case admin pendaftar program mendukung filter, hitung jumlah, update a
     },
     countByProgram: async () => 1,
     countsByProgram: async () => ({ [baseProgram.id]: 3 }),
+    countsByCohort: async () => ({ "2024": 1 }),
   };
 
   const list = await listProgramRegistrations(repo, {
@@ -386,6 +388,10 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
           calls.push(`count:${id}`);
           return 12;
         },
+        countsByCohort: async (id: string) => {
+          calls.push(`cohortCounts:${id}`);
+          return { "2023": 2, "2024": 5 };
+        },
       },
     },
   };
@@ -410,6 +416,7 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
     loadProgramRegistrationPage(id: string): Promise<{
       program: Program | null;
       registeredCount: number;
+      cohortCounts: Record<string, number>;
       configured: boolean;
     }>;
   };
@@ -423,6 +430,7 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
     {
       program: { ...baseProgram, registrationGroupLink: "" },
       registeredCount: 0,
+      cohortCounts: {},
       configured: false,
     },
   );
@@ -434,6 +442,7 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
   );
   assert.equal(pageData.configured, true);
   assert.equal(pageData.registeredCount, 12);
+  assert.deepEqual(pageData.cohortCounts, { "2023": 2, "2024": 5 });
   assert.equal(pageData.program?.id, baseProgram.id);
   assert.equal(pageData.program?.registrationGroupLink, "");
   assert.deepEqual(
@@ -441,6 +450,7 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
     DEFAULT_PROGRAM_FORM_CONFIG,
   );
   assert.deepEqual(Object.keys(pageData).sort(), [
+    "cohortCounts",
     "configured",
     "program",
     "registeredCount",
@@ -452,6 +462,7 @@ test("loader publik loadPrograms dan loadProgramRegistrationPage tidak membocork
     {
       program: null,
       registeredCount: 0,
+      cohortCounts: {},
       configured: true,
     },
   );
@@ -522,15 +533,24 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
         createdAt: new Date('2026-11-17T08:00:00Z'),
       };
 
+      const cohortCounts = {};
       const tx = {
         $queryRaw: async () => [programRow],
         programRegistration: {
-          count: async () => currentCount,
+          count: async ({ where }) => {
+            if (where && where.angkatan) {
+              return cohortCounts[where.angkatan] || 0;
+            }
+            return currentCount;
+          },
           create: async ({ data }) => {
             if (throwP2002) {
               throw new Prisma.PrismaClientKnownRequestError('Unique', { code: 'P2002', clientVersion: '7.10.1' });
             }
             currentCount++;
+            if (data.angkatan) {
+              cohortCounts[data.angkatan] = (cohortCounts[data.angkatan] || 0) + 1;
+            }
             return { ...savedRow, ...data };
           },
         },
@@ -576,7 +596,16 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
             assert.ok(Array.isArray(where.OR));
             return [{ ...savedRow, program: { title: 'IT Versary & Sertijab 2026', period: '2025/2026' } }];
           },
-          groupBy: async () => [{ programId, _count: { _all: 4 } }],
+          groupBy: async ({ by }) => {
+            if (by && by[0] === 'angkatan') {
+              return [
+                { angkatan: '2024', _count: { _all: 2 } },
+                { angkatan: '2025', _count: { _all: 1 } },
+                { angkatan: '', _count: { _all: 1 } },
+              ];
+            }
+            return [{ programId, _count: { _all: 4 } }];
+          },
           update: async ({ data }) => {
             if (data.nim === '99999999') {
               throw new Prisma.PrismaClientKnownRequestError('Unique', { code: 'P2002', clientVersion: '7.10.1' });
@@ -634,6 +663,37 @@ test("repository Prisma menangani transaksi kuota atomik, P2002, P2003 delete, P
         assert.equal(list[0].programTitle, 'IT Versary & Sertijab 2026');
         assert.deepEqual(list[0].customResponses, { asal_instansi: 'Undiknas' });
         assert.deepEqual(await programRegistrationRepository.countsByProgram(), { [programId]: 4 });
+        assert.deepEqual(await programRegistrationRepository.countsByCohort(programId), { '2024': 2, '2025': 1 });
+        assert.deepEqual(await programRegistrationRepository.countsByCohort('invalid-uuid'), {});
+
+        throwP2002 = false;
+        programRow.registrationMaxQuota = 10;
+        programRow.registrationFormConfig = {
+          ...programRow.registrationFormConfig,
+          cohortQuotas: {
+            enabled: true,
+            tiers: [
+              { angkatan: '2024', maxQuota: 1 },
+              { angkatan: '2025', maxQuota: 1 },
+            ],
+          },
+        };
+        await assert.rejects(
+          programRegistrationRepository.create(programId, {
+            nama: 'Nyoman', nim: '22010901', angkatan: '2022', noHp: '08123456789', idLine: 'nyoman', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas' },
+          }),
+          ValidationError,
+        );
+        await assert.rejects(
+          programRegistrationRepository.create(programId, {
+            nama: 'Wayan', nim: '22010902', angkatan: '2024', noHp: '08123456789', idLine: 'wayan', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas' },
+          }),
+          (e) => e instanceof ConflictError && e.reason === 'quota' && /angkatan 2024/i.test(e.message),
+        );
+        const created2025 = await programRegistrationRepository.create(programId, {
+          nama: 'Komang', nim: '22010903', angkatan: '2025', noHp: '08123456789', idLine: 'komang', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas' },
+        });
+        assert.equal(created2025.angkatan, '2025');
 
         const updated = await programRegistrationRepository.update(regId, {
           nama: 'Made', nim: '22010101', angkatan: '2024', noHp: '', idLine: '', email: '', catatan: '', customResponses: { asal_instansi: 'Undiknas Baru' },
@@ -894,6 +954,7 @@ test("registerProgram dan updateProgramRegistration memvalidasi terhadap konfigu
   const regRepo: ProgramRegistrationRepository = {
     countByProgram: async () => 0,
     countsByProgram: async () => ({ [customProgram.id]: 1 }),
+    countsByCohort: async () => ({}),
     list: async () => [],
     get: async (id) => (id === savedReg.id ? savedReg : null),
     create: async (_pid, input) => {
@@ -1018,5 +1079,130 @@ test("registerProgram dan updateProgramRegistration memvalidasi terhadap konfigu
       { nama: "Ayu", nim: "22010505" },
     ),
     NotFoundError,
+  );
+});
+
+test("kuota per angkatan membatasi whitelist publik, mengizinkan edit admin historis, dan menegakkan kuota per angkatan serta kuota total", async () => {
+  const cohortFormConfig: ProgramFormConfig = {
+    builtInFields: { ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields },
+    customFields: [],
+    cohortQuotas: {
+      enabled: true,
+      tiers: createPresetCohortTiers(2023, 2026, 5),
+    },
+  };
+
+  // Public input rejects angkatan outside whitelist (e.g. 2022) and accepts listed angkatan.
+  const accepted = validateProgramRegistrationInput(
+    { ...validInput, angkatan: "2024" },
+    cohortFormConfig,
+  );
+  assert.equal(accepted.angkatan, "2024");
+
+  assert.throws(
+    () =>
+      validateProgramRegistrationInput(
+        { ...validInput, angkatan: "2022" },
+        cohortFormConfig,
+      ),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.message ===
+        "Pendaftaran program ini hanya dibuka untuk angkatan 2023, 2024, 2025, 2026.",
+  );
+
+  // Admin edit remains allowed for historical cohorts outside the whitelist.
+  const historicalAdminEdit = validateProgramRegistrationAdminUpdate(
+    { ...validInput, angkatan: "2022" },
+    cohortFormConfig,
+  );
+  assert.equal(historicalAdminEdit.angkatan, "2022");
+
+  // registerProgram enforces 5-per-cohort limit while allowing other cohorts and enforcing overall registrationMaxQuota.
+  const stored: ProgramRegistration[] = [];
+  const cohortProgram: Program = {
+    ...baseProgram,
+    registrationMaxQuota: 6,
+    registrationFormConfig: cohortFormConfig,
+  };
+  const programRepo: Pick<ProgramRepository, "getPublished"> = {
+    getPublished: async () => cohortProgram,
+  };
+  const regRepo: Pick<
+    ProgramRegistrationRepository,
+    "countByProgram" | "countsByCohort" | "create"
+  > = {
+    countByProgram: async (programId) =>
+      stored.filter((row) => row.programId === programId).length,
+    countsByCohort: async (programId) => {
+      const counts: Record<string, number> = {};
+      for (const row of stored) {
+        if (row.programId === programId && row.angkatan) {
+          counts[row.angkatan] = (counts[row.angkatan] ?? 0) + 1;
+        }
+      }
+      return counts;
+    },
+    create: async (programId, input) => {
+      const row = makeRegistration({ ...input, programId });
+      stored.push(row);
+      return row;
+    },
+  };
+
+  for (let i = 1; i <= 5; i += 1) {
+    await registerProgram(programRepo, regRepo, cohortProgram.id, {
+      ...validInput,
+      nim: `2401000${i}`,
+      angkatan: "2024",
+    });
+  }
+  assert.equal(stored.length, 5);
+
+  // 6th registrant from 2024 is rejected with ConflictError("quota").
+  await assert.rejects(
+    registerProgram(programRepo, regRepo, cohortProgram.id, {
+      ...validInput,
+      nim: "24010006",
+      angkatan: "2024",
+    }),
+    (error: unknown) =>
+      error instanceof ConflictError &&
+      error.reason === "quota" &&
+      error.message ===
+        "Kuota pendaftaran untuk angkatan 2024 sudah penuh (maksimal 5 peserta).",
+  );
+  assert.equal(stored.length, 5);
+
+  // Registrant from 2022 is rejected with ValidationError.
+  await assert.rejects(
+    registerProgram(programRepo, regRepo, cohortProgram.id, {
+      ...validInput,
+      nim: "22010001",
+      angkatan: "2022",
+    }),
+    ValidationError,
+  );
+
+  // Registrant from 2025 still succeeds (total reaches 6 = registrationMaxQuota).
+  const reg2025 = await registerProgram(programRepo, regRepo, cohortProgram.id, {
+    ...validInput,
+    nim: "25010001",
+    angkatan: "2025",
+  });
+  assert.equal(reg2025.registration.angkatan, "2025");
+  assert.equal(stored.length, 6);
+
+  // Next registrant from 2026 is blocked by overall registrationMaxQuota (6).
+  await assert.rejects(
+    registerProgram(programRepo, regRepo, cohortProgram.id, {
+      ...validInput,
+      nim: "26010001",
+      angkatan: "2026",
+    }),
+    (error: unknown) =>
+      error instanceof ConflictError &&
+      error.reason === "quota" &&
+      error.message === "Kuota peserta untuk program kerja ini sudah penuh.",
   );
 });

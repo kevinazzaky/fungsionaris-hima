@@ -12,6 +12,7 @@ import {
 import {
   cloneDefaultProgramFormConfig,
   normalizeProgramFormConfig,
+  resolveCohortQuotaConfig,
 } from "@/domain/program-form-config";
 import { requestJson } from "./request";
 import { EditorDialog } from "./editor-dialog";
@@ -800,6 +801,10 @@ export function ProgramListRow({
     item.registrationMode === "internal"
       ? (item.registrationFormConfig?.customFields?.length ?? 0)
       : 0;
+  const cohortQuotaConfig =
+    item.registrationMode === "internal"
+      ? resolveCohortQuotaConfig(item.registrationFormConfig)
+      : null;
   const countText =
     count !== null
       ? item.registrationMaxQuota !== null
@@ -832,6 +837,11 @@ export function ProgramListRow({
           {customFieldCount > 0 && (
             <span className="admin-status">
               {`${customFieldCount} kolom custom`}
+            </span>
+          )}
+          {cohortQuotaConfig?.enabled && (
+            <span className="admin-status">
+              {`Kuota ${cohortQuotaConfig.tiers.length} angkatan`}
             </span>
           )}
           {countText !== null && (

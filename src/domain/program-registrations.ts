@@ -1,6 +1,7 @@
 import { text, ValidationError } from "./admin";
 import {
   DEFAULT_PROGRAM_FORM_CONFIG,
+  resolveCohortQuotaConfig,
   type CustomFormField,
   type ProgramCustomResponses,
   type ProgramFormConfig,
@@ -69,6 +70,7 @@ export interface ProgramRegistrationRepository {
   delete(id: string): Promise<ProgramRegistration>;
   countByProgram(programId: string): Promise<number>;
   countsByProgram(): Promise<Record<string, number>>;
+  countsByCohort(programId: string): Promise<Record<string, number>>;
 }
 
 // Check raw strings before trim() so leading/trailing newlines or tabs are rejected rather than stripped.
@@ -281,10 +283,23 @@ function validateParticipant(
   if (!/^\d{5,30}$/.test(nim))
     throw new ValidationError("NIM harus berisi 5 sampai 30 digit angka.");
 
+  const cohortConfig = resolveCohortQuotaConfig(formConfig);
+  const enforceCohortWhitelist = !isAdminEdit && cohortConfig.enabled;
   const angkatan =
-    builtIn.angkatan === "hidden"
+    builtIn.angkatan === "hidden" && !enforceCohortWhitelist
       ? ""
-      : validateAngkatan(data.angkatan, builtIn.angkatan === "required");
+      : validateAngkatan(
+          data.angkatan,
+          builtIn.angkatan === "required" || enforceCohortWhitelist,
+        );
+  if (
+    enforceCohortWhitelist &&
+    (!angkatan || !cohortConfig.tiers.some((tier) => tier.angkatan === angkatan))
+  ) {
+    throw new ValidationError(
+      `Pendaftaran program ini hanya dibuka untuk angkatan ${cohortConfig.tiers.map((tier) => tier.angkatan).join(", ")}.`,
+    );
+  }
   const noHp =
     builtIn.noHp === "hidden"
       ? ""

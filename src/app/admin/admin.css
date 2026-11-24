@@ -630,6 +630,13 @@
   height: 20px;
   accent-color: #805400;
 }
+.admin select:disabled {
+  background: #f6f5f1;
+  color: #4f4f45;
+  border-color: #8c8c82;
+  cursor: not-allowed;
+  opacity: 1;
+}
 .admin input::placeholder,
 .admin textarea::placeholder {
   color: #68685f;
@@ -765,6 +772,81 @@
 .admin-form-settings-savebar .admin-meta {
   margin-top: 0;
 }
+.admin-cohort-quota-toggle {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.admin-cohort-quota-toggle .admin-check {
+  font-weight: 600;
+}
+.admin-cohort-quota-box {
+  display: grid;
+  gap: 0.95rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.85rem;
+  background: #f6f5f1;
+  color: #272723;
+}
+.admin-cohort-quota-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.admin-cohort-quota-header > div {
+  min-width: 0;
+}
+.admin-cohort-quota-header .admin-meta {
+  margin-top: 0.2rem;
+}
+.admin-cohort-tier-list {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.admin-cohort-tier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid #8c8c82;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+.admin-cohort-tier-row label {
+  min-width: 0;
+}
+.admin-cohort-tier-row input {
+  min-height: 44px;
+  border-color: #8c8c82;
+}
+.admin-cohort-tier-row .admin-button {
+  min-height: 44px;
+  width: 100%;
+}
+.admin-cohort-summary {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid #8c8c82;
+  font-size: 0.9rem;
+  color: #272723;
+}
+.admin-cohort-summary p {
+  color: #272723;
+}
+.admin-cohort-summary .admin-meta {
+  color: #62625b;
+  margin-top: 0;
+}
 .admin-form-builder {
   display: grid;
   gap: 1.25rem;
@@ -861,6 +943,12 @@
 @media (min-width: 540px) {
   .admin-form-builder-builtin-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-cohort-tier-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .admin-cohort-tier-row .admin-button {
+    width: auto;
   }
 }
 @media (min-width: 960px) {
