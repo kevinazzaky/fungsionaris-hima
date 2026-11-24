@@ -11,7 +11,6 @@ import { Cake } from "@phosphor-icons/react/dist/ssr";
 import { ProgramPeriodTabs } from "../src/components/detail/program-period-tabs";
 import { ProgramModal } from "../src/components/home/program-modal";
 import {
-  buildCohortQuotaSummary,
   ProgramRegistrationConfirmation,
   ProgramRegistrationForm,
   ProgramRegistrationPrintableReceipt,
@@ -20,6 +19,7 @@ import {
 } from "../src/components/programs/program-registration-form";
 import { ValidationError } from "../src/domain/admin";
 import {
+  buildCohortQuotaSummary,
   DEFAULT_PROGRAM_FORM_CONFIG,
   normalizeProgramFormConfig,
   type ProgramFormConfig,
@@ -899,7 +899,6 @@ test("generateMetadata dan halaman daftar proker memanggil notFound() serta mene
     "@phosphor-icons/react/dist/ssr": new Proxy({}, { get: () => stub }),
     "@/components/detail/detail-header": { DetailHeader: stub },
     "@/components/programs/program-registration-form": {
-      buildCohortQuotaSummary,
       ProgramRegistrationForm: (props: Record<string, unknown>) => {
         capturedFormProps = props;
         return null;
@@ -909,7 +908,7 @@ test("generateMetadata dan halaman daftar proker memanggil notFound() serta mene
     "@/data/programs": {
       loadProgramRegistrationPage: async () => mockData,
     },
-    "@/domain/program-form-config": { normalizeProgramFormConfig },
+    "@/domain/program-form-config": { buildCohortQuotaSummary, normalizeProgramFormConfig },
     "@/domain/programs": {
       PROGRAM_STATUSES: {
         open: "Pendaftaran Dibuka",

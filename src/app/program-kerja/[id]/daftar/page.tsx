@@ -13,13 +13,13 @@ import {
   Users,
 } from "@phosphor-icons/react/dist/ssr";
 import { DetailHeader } from "@/components/detail/detail-header";
-import {
-  buildCohortQuotaSummary,
-  ProgramRegistrationForm,
-} from "@/components/programs/program-registration-form";
+import { ProgramRegistrationForm } from "@/components/programs/program-registration-form";
 import Link from "@/components/ui/navigation-link";
 import { loadProgramRegistrationPage } from "@/data/programs";
-import { normalizeProgramFormConfig } from "@/domain/program-form-config";
+import {
+  buildCohortQuotaSummary,
+  normalizeProgramFormConfig,
+} from "@/domain/program-form-config";
 import { PROGRAM_STATUSES } from "@/domain/programs";
 
 const getProgramRegistrationData = cache((id: string) =>
