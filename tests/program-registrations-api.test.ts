@@ -371,6 +371,7 @@ test("endpoint admin list, PATCH, dan DELETE memeriksa sesi, origin, UUID, dan m
     },
     countByProgram: async () => 1,
     countsByProgram: async () => ({ [PROGRAM_ID]: 1 }),
+    countsByCohort: async () => ({}),
   };
 
   const requireAdmin = async () => {
@@ -906,6 +907,7 @@ test("POST publik dan PATCH admin memvalidasi formulir custom, batas payload 32K
   const regRepo: ProgramRegistrationRepository = {
     countByProgram: async () => 0,
     countsByProgram: async () => ({ [customProgram.id]: 1 }),
+    countsByCohort: async () => ({}),
     list: async () => [],
     get: async (id) => (id === stored.id ? stored : null),
     create: async (pid, input) => {

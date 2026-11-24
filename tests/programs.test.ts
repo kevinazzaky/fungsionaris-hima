@@ -6,9 +6,12 @@ import {
   CONFIGURABLE_BUILT_IN_FIELDS,
   CUSTOM_FIELD_TYPES,
   DEFAULT_PROGRAM_FORM_CONFIG,
+  MAX_COHORT_TIERS,
+  createPresetCohortTiers,
   formatCustomResponseValue,
   normalizeProgramFormConfig,
   normalizeStoredCustomResponses,
+  resolveCohortQuotaConfig,
   validateProgramFormConfig,
 } from "../src/domain/program-form-config";
 import { initialPrograms } from "../src/lib/program-seed";
@@ -746,4 +749,220 @@ test("saveProgramFormSettings memperbarui pengaturan formulir sambil menjaga met
   assert.equal(saved.sortOrder, 2);
   assert.equal(saved.isPublished, true);
   assert.equal(saved.imagePath, "programs/existing-cover.webp");
+});
+
+test("validasi dan normalisasi cohortQuotas mendukung preset 2023-2026, tier nonaktif, dan aturan angkatan wajib", () => {
+  assert.equal(MAX_COHORT_TIERS, 20);
+  const presetTiers = createPresetCohortTiers();
+  assert.deepEqual(presetTiers, [
+    { angkatan: "2023", maxQuota: 5 },
+    { angkatan: "2024", maxQuota: 5 },
+    { angkatan: "2025", maxQuota: 5 },
+    { angkatan: "2026", maxQuota: 5 },
+  ]);
+
+  assert.deepEqual(resolveCohortQuotaConfig(null), { enabled: false, tiers: [] });
+  assert.deepEqual(resolveCohortQuotaConfig(DEFAULT_PROGRAM_FORM_CONFIG), {
+    enabled: false,
+    tiers: [],
+  });
+  assert.deepEqual(
+    resolveCohortQuotaConfig({
+      ...DEFAULT_PROGRAM_FORM_CONFIG,
+      cohortQuotas: { enabled: true, tiers: [] },
+    }),
+    { enabled: false, tiers: [] },
+  );
+
+  // Disabled and empty omits cohortQuotas so it matches DEFAULT_PROGRAM_FORM_CONFIG.
+  const emptyDisabled = validateProgramFormConfig({
+    builtInFields: DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+    customFields: [],
+    cohortQuotas: { enabled: false, tiers: [] },
+  });
+  assert.equal("cohortQuotas" in emptyDisabled, false);
+  assert.deepEqual(emptyDisabled, DEFAULT_PROGRAM_FORM_CONFIG);
+
+  // Disabled with tiers preserves sorted tiers and allows optional/hidden angkatan.
+  const disabledWithTiers = validateProgramFormConfig({
+    builtInFields: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+      angkatan: "optional",
+    },
+    cohortQuotas: {
+      enabled: false,
+      tiers: [
+        { angkatan: "2026", maxQuota: "8" },
+        { angkatan: "2023", maxQuota: 5 },
+      ],
+    },
+  });
+  assert.deepEqual(disabledWithTiers.cohortQuotas, {
+    enabled: false,
+    tiers: [
+      { angkatan: "2023", maxQuota: 5 },
+      { angkatan: "2026", maxQuota: 8 },
+    ],
+  });
+
+  // Enabled with preset 2023-2026 @ 5 sorted ascending.
+  const enabledPreset = validateProgramFormConfig({
+    builtInFields: DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+    customFields: [],
+    cohortQuotas: {
+      enabled: true,
+      tiers: [...presetTiers].reverse(),
+    },
+  });
+  assert.deepEqual(enabledPreset.cohortQuotas, {
+    enabled: true,
+    tiers: presetTiers,
+  });
+  const resolved = resolveCohortQuotaConfig(enabledPreset);
+  assert.equal(resolved.enabled, true);
+  assert.deepEqual(resolved.tiers, presetTiers);
+  resolved.tiers[0].maxQuota = 99;
+  assert.equal(enabledPreset.cohortQuotas?.tiers[0].maxQuota, 5);
+
+  // Round-trip through validateProgramFormSettings and validateProgram.
+  const fromSettings = validateProgramFormSettings({
+    status: "open",
+    registrationGroupLink: "",
+    registrationMaxQuota: 20,
+    registrationFormConfig: JSON.stringify(enabledPreset),
+  });
+  assert.deepEqual(fromSettings.registrationFormConfig, enabledPreset);
+
+  assert.throws(
+    () =>
+      validateProgramFormConfig({
+        builtInFields: DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+        cohortQuotas: { enabled: true, tiers: [] },
+      }),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.message ===
+        "Tambahkan minimal 1 angkatan sebelum mengaktifkan kuota per angkatan.",
+  );
+
+  for (const mode of ["optional", "hidden"] as const) {
+    assert.throws(
+      () =>
+        validateProgramFormConfig({
+          builtInFields: {
+            ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+            angkatan: mode,
+          },
+          cohortQuotas: { enabled: true, tiers: presetTiers },
+        }),
+      (error: unknown) =>
+        error instanceof ValidationError &&
+        error.message ===
+          "Kolom bawaan Angkatan wajib diatur Wajib saat kuota per angkatan aktif.",
+    );
+  }
+
+  for (const invalidCohort of [
+    null,
+    [],
+    "2024",
+    { enabled: "true", tiers: presetTiers },
+    { enabled: false, tiers: "not-array" },
+    {
+      enabled: false,
+      tiers: Array.from({ length: MAX_COHORT_TIERS + 1 }, (_, i) => ({
+        angkatan: String(2010 + i),
+        maxQuota: 5,
+      })),
+    },
+    { enabled: false, tiers: ["2024"] },
+    { enabled: false, tiers: [{ angkatan: "24", maxQuota: 5 }] },
+    { enabled: false, tiers: [{ angkatan: "1899", maxQuota: 5 }] },
+    { enabled: false, tiers: [{ angkatan: "2024\n", maxQuota: 5 }] },
+    {
+      enabled: false,
+      tiers: [
+        { angkatan: "2024", maxQuota: 5 },
+        { angkatan: "2024", maxQuota: 10 },
+      ],
+    },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: 0 }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: -3 }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: 2.5 }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: "0" }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: "2.5" }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: "5\n" }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: true }] },
+    { enabled: false, tiers: [{ angkatan: "2024", maxQuota: 2147483648 }] },
+  ]) {
+    assert.throws(
+      () =>
+        validateProgramFormConfig({
+          builtInFields: DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+          cohortQuotas: invalidCohort,
+        }),
+      ValidationError,
+    );
+  }
+
+  // normalizeProgramFormConfig safely filters invalid/duplicate tiers, sorts ascending, and forces angkatan required when enabled.
+  const normalizedEnabled = normalizeProgramFormConfig({
+    builtInFields: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+      angkatan: "hidden",
+    },
+    cohortQuotas: {
+      enabled: true,
+      tiers: [
+        { angkatan: "2025", maxQuota: "7" },
+        { angkatan: "2023", maxQuota: 5 },
+        { angkatan: "2023", maxQuota: 9 },
+        { angkatan: "2024\n", maxQuota: 5 },
+        { angkatan: "1899", maxQuota: 5 },
+        { angkatan: "2026", maxQuota: 0 },
+        { angkatan: "2026", maxQuota: 1.5 },
+        { angkatan: "2024", maxQuota: 6 },
+      ],
+    },
+  });
+  assert.equal(normalizedEnabled.builtInFields.angkatan, "required");
+  assert.deepEqual(normalizedEnabled.cohortQuotas, {
+    enabled: true,
+    tiers: [
+      { angkatan: "2023", maxQuota: 5 },
+      { angkatan: "2024", maxQuota: 6 },
+      { angkatan: "2025", maxQuota: 7 },
+    ],
+  });
+
+  // normalizeProgramFormConfig omits cohortQuotas when enabled has zero valid tiers.
+  const normalizedEmpty = normalizeProgramFormConfig({
+    builtInFields: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+      angkatan: "optional",
+    },
+    cohortQuotas: {
+      enabled: true,
+      tiers: [{ angkatan: "invalid", maxQuota: 0 }],
+    },
+  });
+  assert.equal(normalizedEmpty.builtInFields.angkatan, "optional");
+  assert.equal("cohortQuotas" in normalizedEmpty, false);
+
+  // normalizeProgramFormConfig preserves disabled tiers without forcing angkatan required.
+  const normalizedDisabled = normalizeProgramFormConfig({
+    builtInFields: {
+      ...DEFAULT_PROGRAM_FORM_CONFIG.builtInFields,
+      angkatan: "optional",
+    },
+    cohortQuotas: {
+      enabled: false,
+      tiers: [{ angkatan: "2024", maxQuota: 5 }],
+    },
+  });
+  assert.equal(normalizedDisabled.builtInFields.angkatan, "optional");
+  assert.deepEqual(normalizedDisabled.cohortQuotas, {
+    enabled: false,
+    tiers: [{ angkatan: "2024", maxQuota: 5 }],
+  });
 });
