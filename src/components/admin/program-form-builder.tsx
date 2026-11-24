@@ -85,6 +85,9 @@ export function ProgramFormBuilder({
   );
 
   function updateBuiltInMode(key: BuiltInFieldKey, mode: BuiltInFieldMode) {
+    if (key === "angkatan" && Boolean(value.cohortQuotas?.enabled)) {
+      return;
+    }
     onChange({
       ...value,
       builtInFields: {
@@ -191,30 +194,37 @@ export function ProgramFormBuilder({
               BuiltInFieldKey,
               string,
             ][]
-          ).map(([key, label]) => (
-            <label key={key} className="admin-form-builder-builtin-item">
-              <span>{label}</span>
-              <select
-                aria-label={`Status kolom ${label}`}
-                disabled={disabled}
-                value={value.builtInFields[key]}
-                onChange={(event) =>
-                  updateBuiltInMode(key, event.target.value as BuiltInFieldMode)
-                }
-              >
-                {(
-                  Object.entries(BUILT_IN_FIELD_MODES) as [
-                    BuiltInFieldMode,
-                    string,
-                  ][]
-                ).map(([modeKey, modeLabel]) => (
-                  <option key={modeKey} value={modeKey}>
-                    {modeLabel}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
+          ).map(([key, label]) => {
+            const cohortQuotaLocked =
+              key === "angkatan" && Boolean(value.cohortQuotas?.enabled);
+            return (
+              <label key={key} className="admin-form-builder-builtin-item">
+                <span>{label}</span>
+                <select
+                  aria-label={`Status kolom ${label}`}
+                  disabled={disabled || cohortQuotaLocked}
+                  value={cohortQuotaLocked ? "required" : value.builtInFields[key]}
+                  onChange={(event) =>
+                    updateBuiltInMode(key, event.target.value as BuiltInFieldMode)
+                  }
+                >
+                  {(
+                    Object.entries(BUILT_IN_FIELD_MODES) as [
+                      BuiltInFieldMode,
+                      string,
+                    ][]
+                  ).map(([modeKey, modeLabel]) => (
+                    <option key={modeKey} value={modeKey}>
+                      {modeLabel}
+                    </option>
+                  ))}
+                </select>
+                {cohortQuotaLocked && (
+                  <small>Dikunci ke Wajib selama kuota per angkatan aktif.</small>
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
 

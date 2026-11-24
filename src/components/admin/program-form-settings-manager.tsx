@@ -4,8 +4,11 @@ import { useEffect, useId, useRef, useState } from "react";
 import { PROGRAM_STATUSES, type Program } from "@/domain/programs";
 import { ValidationError } from "@/domain/admin";
 import {
+  createPresetCohortTiers,
+  MAX_COHORT_TIERS,
   normalizeProgramFormConfig,
   validateProgramFormConfig,
+  type CohortQuotaTier,
   type ProgramFormConfig,
 } from "@/domain/program-form-config";
 import { PendingLabel } from "@/components/ui/pending-label";
@@ -27,12 +30,259 @@ export function confirmDiscardUnsavedFormSettings(
   return window.confirm(UNSAVED_FORM_SETTINGS_CONFIRM_MESSAGE);
 }
 
+export type CohortQuotaTierDraft = {
+  id: string;
+  angkatan: string;
+  maxQuota: string;
+};
+
 export type ProgramFormSettingsDraft = {
   status: Program["status"];
   registrationMaxQuota: string;
   registrationGroupLink: string;
   registrationFormConfig: ProgramFormConfig;
+  cohortQuotaDraftTiers?: CohortQuotaTierDraft[];
 };
+
+let cohortTierDraftCounter = 0;
+
+function nextCohortTierDraftId(): string {
+  cohortTierDraftCounter += 1;
+  return `cohort-tier-${cohortTierDraftCounter}`;
+}
+
+function parsePositiveQuotaDraft(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 2147483647) {
+    return null;
+  }
+  return parsed;
+}
+
+export function getCohortQuotaTierDrafts(
+  draft: ProgramFormSettingsDraft,
+): CohortQuotaTierDraft[] {
+  if (draft.cohortQuotaDraftTiers !== undefined) {
+    return draft.cohortQuotaDraftTiers;
+  }
+  return (draft.registrationFormConfig.cohortQuotas?.tiers ?? []).map(
+    (tier, index) => ({
+      id: `saved-tier-${index}-${tier.angkatan}`,
+      angkatan: tier.angkatan,
+      maxQuota: String(tier.maxQuota),
+    }),
+  );
+}
+
+function syncFormConfigCohortQuotas(
+  config: ProgramFormConfig,
+  enabled: boolean,
+  tiers: CohortQuotaTierDraft[],
+): ProgramFormConfig {
+  const builtInFields = enabled
+    ? { ...config.builtInFields, angkatan: "required" as const }
+    : config.builtInFields;
+  if (!enabled && tiers.length === 0) {
+    return {
+      builtInFields,
+      customFields: config.customFields,
+    };
+  }
+  const parsedTiers: CohortQuotaTier[] = tiers.map((tier) => ({
+    angkatan: tier.angkatan.trim(),
+    maxQuota: parsePositiveQuotaDraft(tier.maxQuota) ?? 0,
+  }));
+  return {
+    builtInFields,
+    customFields: config.customFields,
+    cohortQuotas: {
+      enabled,
+      tiers: parsedTiers,
+    },
+  };
+}
+
+export function toggleDraftCohortQuotas(
+  draft: ProgramFormSettingsDraft,
+  enabled: boolean,
+): ProgramFormSettingsDraft {
+  const currentTiers = getCohortQuotaTierDrafts(draft);
+  const nextTiers = enabled
+    ? currentTiers
+    : currentTiers.filter(
+        (tier) => tier.angkatan.trim() !== "" || tier.maxQuota.trim() !== "",
+      );
+  return {
+    ...draft,
+    cohortQuotaDraftTiers: nextTiers,
+    registrationFormConfig: syncFormConfigCohortQuotas(
+      draft.registrationFormConfig,
+      enabled,
+      nextTiers,
+    ),
+  };
+}
+
+export function applyDraftCohortPreset(
+  draft: ProgramFormSettingsDraft,
+  startYear = 2023,
+  endYear = 2026,
+  maxQuota = 5,
+): ProgramFormSettingsDraft {
+  const presetTiers = createPresetCohortTiers(startYear, endYear, maxQuota);
+  const nextTiers: CohortQuotaTierDraft[] = presetTiers.map((tier, index) => ({
+    id: `preset-tier-${index}-${tier.angkatan}`,
+    angkatan: tier.angkatan,
+    maxQuota: String(tier.maxQuota),
+  }));
+  return {
+    ...draft,
+    cohortQuotaDraftTiers: nextTiers,
+    registrationFormConfig: syncFormConfigCohortQuotas(
+      draft.registrationFormConfig,
+      true,
+      nextTiers,
+    ),
+  };
+}
+
+export function addDraftCohortTier(
+  draft: ProgramFormSettingsDraft,
+  tierId?: string,
+): ProgramFormSettingsDraft {
+  const currentTiers = getCohortQuotaTierDrafts(draft);
+  if (currentTiers.length >= MAX_COHORT_TIERS) {
+    return draft;
+  }
+  const nextTiers: CohortQuotaTierDraft[] = [
+    ...currentTiers,
+    {
+      id: tierId ?? nextCohortTierDraftId(),
+      angkatan: "",
+      maxQuota: "",
+    },
+  ];
+  return {
+    ...draft,
+    cohortQuotaDraftTiers: nextTiers,
+    registrationFormConfig: syncFormConfigCohortQuotas(
+      draft.registrationFormConfig,
+      Boolean(draft.registrationFormConfig.cohortQuotas?.enabled),
+      nextTiers,
+    ),
+  };
+}
+
+export function updateDraftCohortTier(
+  draft: ProgramFormSettingsDraft,
+  index: number,
+  patch: { angkatan?: string; maxQuota?: string },
+): ProgramFormSettingsDraft {
+  const currentTiers = getCohortQuotaTierDrafts(draft);
+  if (index < 0 || index >= currentTiers.length) {
+    return draft;
+  }
+  const nextTiers = currentTiers.map((tier, idx) =>
+    idx === index ? { ...tier, ...patch } : tier,
+  );
+  return {
+    ...draft,
+    cohortQuotaDraftTiers: nextTiers,
+    registrationFormConfig: syncFormConfigCohortQuotas(
+      draft.registrationFormConfig,
+      Boolean(draft.registrationFormConfig.cohortQuotas?.enabled),
+      nextTiers,
+    ),
+  };
+}
+
+export function removeDraftCohortTier(
+  draft: ProgramFormSettingsDraft,
+  index: number,
+): ProgramFormSettingsDraft {
+  const currentTiers = getCohortQuotaTierDrafts(draft);
+  if (index < 0 || index >= currentTiers.length) {
+    return draft;
+  }
+  const nextTiers = currentTiers.filter((_, idx) => idx !== index);
+  return {
+    ...draft,
+    cohortQuotaDraftTiers: nextTiers,
+    registrationFormConfig: syncFormConfigCohortQuotas(
+      draft.registrationFormConfig,
+      Boolean(draft.registrationFormConfig.cohortQuotas?.enabled),
+      nextTiers,
+    ),
+  };
+}
+
+export function summarizeCohortQuotaDraft(tiers: CohortQuotaTierDraft[]): {
+  tierCount: number;
+  totalCapacity: number;
+} {
+  let totalCapacity = 0;
+  for (const tier of tiers) {
+    const parsed = parsePositiveQuotaDraft(tier.maxQuota);
+    if (parsed !== null) {
+      totalCapacity += parsed;
+    }
+  }
+  return {
+    tierCount: tiers.length,
+    totalCapacity,
+  };
+}
+
+export function buildProgramFormConfigInput(
+  draft: ProgramFormSettingsDraft,
+): Record<string, unknown> {
+  const enabled = Boolean(draft.registrationFormConfig.cohortQuotas?.enabled);
+  const tiers = getCohortQuotaTierDrafts(draft).map((tier) => ({
+    angkatan: tier.angkatan,
+    maxQuota: tier.maxQuota,
+  }));
+  const payload: Record<string, unknown> = {
+    builtInFields: draft.registrationFormConfig.builtInFields,
+    customFields: draft.registrationFormConfig.customFields,
+  };
+  if (enabled || tiers.length > 0) {
+    payload.cohortQuotas = {
+      enabled,
+      tiers,
+    };
+  }
+  return payload;
+}
+
+function serializeFormConfigForComparison(
+  config: ProgramFormConfig,
+  draftTiers?: CohortQuotaTierDraft[],
+): string {
+  const enabled = Boolean(config.cohortQuotas?.enabled);
+  const tiers =
+    draftTiers !== undefined
+      ? draftTiers.map((tier) => ({
+          angkatan: tier.angkatan.trim(),
+          maxQuota: tier.maxQuota.trim(),
+        }))
+      : (config.cohortQuotas?.tiers ?? []).map((tier) => ({
+          angkatan: tier.angkatan.trim(),
+          maxQuota: String(tier.maxQuota),
+        }));
+  const comparable: Record<string, unknown> = {
+    builtInFields: config.builtInFields,
+    customFields: config.customFields,
+  };
+  if (enabled || tiers.length > 0) {
+    comparable.cohortQuotas = {
+      enabled,
+      tiers,
+    };
+  }
+  return JSON.stringify(comparable);
+}
 
 export function createProgramFormSettingsDraft(
   program: Program,
@@ -62,8 +312,11 @@ export function isProgramFormSettingsDirty(
     draft.status !== baseline.status ||
     draft.registrationMaxQuota.trim() !== baselineQuotaText ||
     draft.registrationGroupLink.trim() !== baseline.registrationGroupLink.trim() ||
-    JSON.stringify(draft.registrationFormConfig) !==
-      JSON.stringify(
+    serializeFormConfigForComparison(
+      draft.registrationFormConfig,
+      draft.cohortQuotaDraftTiers,
+    ) !==
+      serializeFormConfigForComparison(
         normalizeProgramFormConfig(baseline.registrationFormConfig),
       )
   );
@@ -395,6 +648,12 @@ function ProgramFormSettingsEditor({
   const publicRegistrationPath = `/program-kerja/${program.id}/daftar`;
   const { baseline, draft } = editorState;
   const isDirty = isProgramFormSettingsDirty(draft, baseline);
+  const cohortQuotasEnabled = Boolean(
+    draft.registrationFormConfig.cohortQuotas?.enabled,
+  );
+  const cohortTierRows = getCohortQuotaTierDrafts(draft);
+  const cohortSummary = summarizeCohortQuotaDraft(cohortTierRows);
+  const atCohortLimit = cohortTierRows.length >= MAX_COHORT_TIERS;
 
   useReportDirty(isDirty, onDirtyChange);
 
@@ -441,7 +700,7 @@ function ProgramFormSettingsEditor({
     let validatedFormConfig: ProgramFormConfig;
     try {
       validatedFormConfig = validateProgramFormConfig(
-        draft.registrationFormConfig,
+        buildProgramFormConfigInput(draft),
       );
     } catch (err) {
       setSaveSuccess("");
@@ -599,6 +858,147 @@ function ProgramFormSettingsEditor({
               Ditampilkan kepada peserta setelah formulir berhasil dikirim.
             </small>
           </label>
+          <div className="admin-cohort-quota-toggle">
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                name="cohortQuotasEnabled"
+                checked={cohortQuotasEnabled}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  updateDraft((prev) => toggleDraftCohortQuotas(prev, checked));
+                }}
+              />
+              Batasi kuota peserta per angkatan (opsional)
+            </label>
+            <small>
+              {cohortQuotasEnabled
+                ? "Hanya angkatan pada daftar di bawah yang dapat mendaftar. Kolom Angkatan otomatis dikunci ke Wajib."
+                : cohortTierRows.length > 0
+                  ? `Pengaturan ${cohortTierRows.length} angkatan tetap disimpan dan aktif kembali jika kotak ini dicentang.`
+                  : "Aktifkan bila panitia ingin membatasi angkatan yang boleh mendaftar beserta kuota tiap angkatan."}
+            </small>
+          </div>
+          {cohortQuotasEnabled && (
+            <div className="admin-cohort-quota-box">
+              <div className="admin-cohort-quota-header">
+                <div>
+                  <h3>Kuota per angkatan</h3>
+                  <p className="admin-meta">
+                    {`${cohortTierRows.length} dari ${MAX_COHORT_TIERS} angkatan diatur`}
+                  </p>
+                </div>
+                <div className="admin-actions">
+                  <button
+                    type="button"
+                    className="admin-button"
+                    onClick={() =>
+                      updateDraft((prev) =>
+                        applyDraftCohortPreset(prev, 2023, 2026, 5),
+                      )
+                    }
+                  >
+                    Preset 2023-2026 (5 peserta)
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-button"
+                    disabled={atCohortLimit}
+                    onClick={() =>
+                      updateDraft((prev) => addDraftCohortTier(prev))
+                    }
+                  >
+                    + Tambah angkatan
+                  </button>
+                </div>
+              </div>
+
+              {atCohortLimit && (
+                <p className="admin-meta">
+                  {`Maksimal ${MAX_COHORT_TIERS} angkatan sudah tercapai.`}
+                </p>
+              )}
+
+              {cohortTierRows.length === 0 ? (
+                <p className="admin-form-builder-empty">
+                  Belum ada angkatan diatur. Gunakan Preset 2023-2026 (5 peserta)
+                  atau tombol + Tambah angkatan.
+                </p>
+              ) : (
+                <div className="admin-cohort-tier-list">
+                  {cohortTierRows.map((tier, index) => (
+                    <div key={tier.id} className="admin-cohort-tier-row">
+                      <label>
+                        Tahun angkatan
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={4}
+                          placeholder="2026"
+                          value={tier.angkatan}
+                          onChange={(event) => {
+                            const angkatan = event.target.value;
+                            updateDraft((prev) =>
+                              updateDraftCohortTier(prev, index, { angkatan }),
+                            );
+                          }}
+                        />
+                      </label>
+                      <label>
+                        Kuota maksimal
+                        <input
+                          type="number"
+                          min={1}
+                          max={2147483647}
+                          step={1}
+                          inputMode="numeric"
+                          placeholder="5"
+                          value={tier.maxQuota}
+                          onChange={(event) => {
+                            const maxQuota = event.target.value;
+                            updateDraft((prev) =>
+                              updateDraftCohortTier(prev, index, { maxQuota }),
+                            );
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="admin-button danger"
+                        aria-label={
+                          tier.angkatan.trim()
+                            ? `Hapus kuota angkatan ${tier.angkatan.trim()}`
+                            : `Hapus baris angkatan ${index + 1}`
+                        }
+                        onClick={() =>
+                          updateDraft((prev) =>
+                            removeDraftCohortTier(prev, index),
+                          )
+                        }
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="admin-cohort-summary">
+                <p>
+                  <strong>
+                    {cohortSummary.tierCount === 0
+                      ? "Tambahkan minimal 1 angkatan sebelum menyimpan."
+                      : `${cohortSummary.tierCount} angkatan: total kapasitas ${cohortSummary.totalCapacity} peserta`}
+                  </strong>
+                </p>
+                {draft.registrationMaxQuota.trim() !== "" && (
+                  <p className="admin-meta">
+                    {`Kuota maksimal keseluruhan (${draft.registrationMaxQuota.trim()} peserta) juga aktif. Kedua batas sama-sama berlaku saat pendaftaran berlangsung.`}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="admin-registration-link-box">
             <strong>Tautan formulir pendaftaran publik</strong>
             <p className="admin-registration-link-path">
